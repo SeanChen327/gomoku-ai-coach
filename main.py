@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from google.genai.types import EmbedContentConfig
@@ -5,9 +6,13 @@ from pydantic import BaseModel
 from google import genai 
 from pinecone import Pinecone
 import os
-from dotenv import load_dotenv # [新增] 导入 dotenv
+from dotenv import load_dotenv
 
-# [新增] 加载本地的 .env 文件
+# [SECURITY UPDATE] Initialize logging for secure auditing and debugging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
 load_dotenv()
 
 app = FastAPI()
@@ -20,11 +25,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# [修改] 使用 os.getenv 安全读取环境变量，不再硬编码
+# Use os.getenv to securely read environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
-# [新增] 安全校验，如果忘记配置会报错提示
+# Security check to prevent application from running without critical credentials
 if not GEMINI_API_KEY or not PINECONE_API_KEY:
     raise ValueError("API Keys are missing. Please set them in your .env file.")
 
@@ -33,14 +38,35 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 pinecone_index = pc.Index("tictactoe-rag")
 
 class ChatRequest(BaseModel):
+    """
+    Data model for incoming chat requests from the client.
+
+    Attributes:
+        message (str): The user's query or instruction to the AI coach.
+        board (list[str]): The current state of the Tic-Tac-Toe board represented 
+                           as a list of 9 strings (e.g., ["X", "O", "", ...]).
+    """
     message: str
     board: list[str]
 
 def analyze_board(board: list[str]) -> str:
+    """
+    Analyzes the current Tic-Tac-Toe board and provides tactical advice.
+
+    This function identifies immediate winning opportunities or critical threats
+    that need to be blocked. It also filters out unsafe diagonal moves.
+
+    Args:
+        board (list[str]): A list of 9 strings representing the board state.
+
+    Returns:
+        str: A formatted string containing tactical advice (CRITICAL, OPPORTUNITY, or NEUTRAL)
+             with a list of recommended safe moves.
+    """
     win_patterns = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]]
     empty_spots = [i for i, v in enumerate(board) if v == ""]
     
-    # --- [ADD THIS] Diagonal Block Logic ---
+    # Diagonal Block Logic
     # If Player is at 0, and Computer is at 4, position 8 is USELESS.
     forbidden_spots = []
     if board[0] == "X" and board[4] == "O": forbidden_spots.append(8)
@@ -50,7 +76,6 @@ def analyze_board(board: list[str]) -> str:
     
     # Final safe moves for the AI to recommend
     safe_moves = [str(i) for i in empty_spots if i not in forbidden_spots]
-    # ---------------------------------------
 
     for p in win_patterns:
         line = [board[p[0]], board[p[1]], board[p[2]]]
@@ -61,9 +86,18 @@ def analyze_board(board: list[str]) -> str:
             
     return f"[NEUTRAL]: No immediate threats. STRONGLY RECOMMENDED moves: {', '.join(safe_moves)}. (Avoid blocked diagonals!)"
 
-
 def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
-    """RAG: Fetches expert advice from Pinecone."""
+    """
+    Retrieves expert Tic-Tac-Toe advice from the Pinecone vector database using RAG.
+
+    Args:
+        board (list[str]): The current state of the Tic-Tac-Toe board.
+        user_message (str): The user's query or prompt.
+
+    Returns:
+        str: Aggregated context retrieved from the database, or a fallback string
+             if no relevant data is found.
+    """
     center_status = board[4] if board[4] else "empty"
     search_query = f"Board center is {center_status}. User question: {user_message}"
     
@@ -90,9 +124,21 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
         
     return "\n".join(retrieved_texts)
 
-
 @app.post("/api/chat")
-def chat_with_ai(request: ChatRequest):
+def chat_with_ai(request: ChatRequest) -> dict:
+    """
+    API endpoint to interact with the Tic-Tac-Toe AI Coach.
+
+    Accepts the current board state and a user message, augments the prompt with 
+    tactical analysis and RAG context, and returns the LLM's coaching response.
+
+    Args:
+        request (ChatRequest): The validated request payload.
+
+    Returns:
+        dict: A dictionary containing the AI's reply, or a safe error message if
+              the generation fails.
+    """
     user_message = request.message
     current_board = request.board
     
@@ -125,4 +171,6 @@ def chat_with_ai(request: ChatRequest):
         )
         return {"reply": response.text}
     except Exception as e:
-        return {"reply": f"API Error: {str(e)}"}
+        # [SECURITY UPDATE] Log the actual error internally, return generic message to user
+        logger.error(f"LLM Generation Error: {str(e)}", exc_info=True)
+        return {"reply": "An internal server error occurred while consulting the AI. Please try again later."}
