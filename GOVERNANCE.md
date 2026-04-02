@@ -1,24 +1,63 @@
 # Project Governance & Decision Log
 
-## Feature: 4x4 Board Expansion
+## 📌 Project Workflows & Review Standards
+
+To ensure production-grade quality and security, all contributors must strictly adhere to the following protocol:
+
+- **Branching Strategy**: All features must be developed on isolated branches (`feature/<feature-name>`). Direct commits to `main` are strictly prohibited.
+- **Pull Request (PR) Protocol**: Every PR must include a clear description of the technical changes and any mock data/tests used.
+- **Mandatory Reviewers**:
+  - **Ruby (@xxandy-what)** MUST act as the Primary Peer Reviewer. No code is merged without her explicit approval.
+  - **Sean (@hyu010)** MUST be tagged as the Technical Consultant for architectural and security decisions.
+
+---
+
+## 📖 Decision Log
+
+### Feature: AI Game Report System (Hybrid Intelligence Architecture)
+
+**Date:** 2026-04-02
+**Branch:** `feature/ai-game-report`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Hybrid Intelligence Architecture**: Migrated from pure LLM analysis to a "Frontend Heuristic Tagging + Backend LLM Summarization" model. The frontend Minimax algorithm now silently tags every move in real-time (`evaluation_label`, `missed_best_move`), drastically reducing LLM hallucination and latency.
+- **Dual-Format Data Export**: Established JSON as the application's internal source of truth, with a seamless frontend engine to compile this JSON into a downloadable CSV report for users instantly at the end of the match.
+- **Environment Auto-Detection**: Implemented dynamic configuration for `API_BASE_URL` in `index.html`. It automatically switches between `http://127.0.0.1:8000` (Local) and relative paths `""` (Vercel Production) based on `window.location.hostname`.
+
+#### 2. Security & Quality Audit
+
+- **State Race Condition Fix**: Resolved a critical bug where the AI Coach was analyzing the computer's ('O') immediate response instead of the user's ('X') move. Replaced basic array popping with a reverse human-player search (`reverse().find(m => m.player === "X")`).
+- **Data Contract Upgrade**: Safely upgraded the `Move` and `ChatRequest` Pydantic models in `main.py` using `Optional[Dict]` to accept the new heuristic tags without breaking backward compatibility or triggering `422 Unprocessable Entity` errors.
+- **Rate Limit Mitigation**: Switched default LLM calls from `gemini-2.5-flash` to `gemini-2.0-flash` (or `1.5-flash`) for local development to bypass the strict 20 RPM Free Tier limits.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (xxandy-what)
+- **Technical Consultant**: Sean (SeanChen327)
+
+---
+
+### Feature: 4x4 Board Expansion
 
 **Date:** 2026-04-02
 **Branch:** `feature/board-4x4-expansion`
 **Status:** Pending Peer Review
 
-### 1. Technical Decisions
+#### 1. Technical Decisions
 
 - **Algorithm Optimization**: Upgraded Minimax to include **Alpha-Beta Pruning** and a **Depth Limit (5)**. This was necessary to prevent browser hang-ups caused by the $4^4$ state space complexity of a 16-cell board.
 - **Coordinate Mapping**: Shifted the win-condition logic from 8 patterns (3x3) to 10 patterns (4x4).
 - **RAG Calibration**: Updated the Pinecone vector database. Deprecated 3x3 heuristics (e.g., center index 4) in favor of 4x4 strategic positioning (indices 5, 6, 10, 11).
 
-### 2. Security & Quality Audit
+#### 2. Security & Quality Audit
 
 - **Prompt Engineering**: Refined system prompts to strictly enforce Player X's perspective and prevent the AI from suggesting occupied or illegal moves.
-- [cite_start]**Code Quality**: All Python functions now include Google-style Docstrings for better maintainability[cite: 1].
-- [cite_start]**Environment**: API keys are securely managed via `.env` and are excluded from version control via `.gitignore`[cite: 1, 2].
+- **Code Quality**: All Python functions now include Google-style Docstrings for better maintainability.
+- **Environment**: API keys are securely managed via `.env` and are excluded from version control via `.gitignore`.
 
-### 3. Review Protocol
+#### 3. Review Protocol
 
 - **Primary Peer Reviewer**: Ruby (xxandy-what)
-- **Technical Consultant**: Sean (hyu010)
+- **Technical Consultant**: Sean (SeanChen327)
