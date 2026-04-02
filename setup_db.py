@@ -2,67 +2,47 @@ from google import genai
 from pinecone import Pinecone
 from google.genai.types import EmbedContentConfig
 import os
-from dotenv import load_dotenv # [新增]
+from dotenv import load_dotenv
 
-# [新增] 加载本地的 .env 文件
 load_dotenv()
 
-# 1. API Configuration
-# [修改] 使用 os.getenv 读取
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 if not GEMINI_API_KEY or not PINECONE_API_KEY:
     raise ValueError("API Keys are missing. Please set them in your .env file.")
 
-# Initialize clients
 client = genai.Client(api_key=GEMINI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("tictactoe-rag")
 
-# 2. English Knowledge Base
-# We use professional terminology like "Radiating Influence" and "Counter-play"
+# 4x4 Specialized Knowledge Base
 knowledge_base = [
     {
-        "id": "kb-1", 
-        "text": "Board Feature: Player X occupies the center. Expert Advice: The center (index 4) is the most critical position. Player X now has radiating influence across all lines. The computer should prioritize occupying the four corners to defend effectively."
+        "id": "kb-4x4-1", 
+        "text": "Board Feature: 4x4 Grid. Expert Advice: In a 4x4 game, the center consists of indices 5, 6, 10, and 11. Controlling these four inner squares is more strategically important than a single center point. They offer the most branching winning lines."
     },
     {
-        "id": "kb-2", 
-        "text": "Board Feature: Empty board, game start. Expert Advice: The best opening moves are either the center or any of the four corners, as they offer the highest number of potential winning lines."
+        "id": "kb-4x4-2", 
+        "text": "Board Feature: 4x4 Diagonals. Expert Advice: Main diagonal is [0, 5, 10, 15] and anti-diagonal is [3, 6, 9, 12]. Winning requires four in a row. A three-in-a-row without a block is a 'threat' but not an immediate win."
     },
     {
-        "id": "kb-3", 
-        "text": "User Query: Computer difficulty, tactical intent, or algorithm. Expert Advice: On 'Hard' difficulty, the computer uses the Minimax algorithm. It calculates every possible outcome to ensure it never loses, making a draw the best possible result for the player."
-    },
-    {
-        "id": "kb-4", 
-        "text": "Board Feature: Player X is in a corner, Computer O is on an adjacent edge. Expert Advice: The player is likely setting up a 'Fork' (double-threat) trap. The computer must immediately seize another corner or the center to neutralize this threat."
-    },
-    # 【新增】：专门针对你遇到的这种开局情况的专家指导
-    {
-        "id": "kb-5",
-        "text": "Board Feature: Player X occupies a corner, Computer O occupies the center. Expert Advice: Player X MUST NOT play the opposite corner, as the diagonal is already blocked by O. Instead, Player X should play an adjacent corner (like index 2 or 6) to maintain flexibility and attempt to set up a double-threat (Fork)."
+        "id": "kb-4x4-3", 
+        "text": "User Query: How to win 4x4? Expert Advice: Focus on creating 'Forks' where two lines of three intersect. Since the board is larger, players have more room to maneuver, making edge-to-corner transitions very effective."
     }
 ]
 
-print("Starting to embed knowledge base and upload to Pinecone...")
+print("Updating Pinecone with 4x4 Expert Knowledge...")
 
 vectors_to_upsert = []
 for item in knowledge_base:
-    # Generate embedding with fixed 768 dimensions
     embedding_result = client.models.embed_content(
         model="gemini-embedding-001",
         contents=item["text"],
         config=EmbedContentConfig(output_dimensionality=768)
     )
     vector_values = embedding_result.embeddings[0].values
-    
-    # Pack for Pinecone
-    vectors_to_upsert.append(
-        (item["id"], vector_values, {"text": item["text"]})
-    )
+    vectors_to_upsert.append((item["id"], vector_values, {"text": item["text"]}))
 
-# Upsert (Update/Insert) the data
 index.upsert(vectors=vectors_to_upsert)
-print("✅ Knowledge base successfully uploaded in English!")
+print("✅ 4x4 Knowledge base successfully updated!")
