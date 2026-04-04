@@ -14,6 +14,30 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Cloud Native Deployment Architecture (Render + PostgreSQL)
+
+**Date:** 2026-04-04
+**Branch:** `feature/render-deployment`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Infrastructure as Code (IaC)**: Introduced `render.yaml` to orchestrate cloud resources autonomously, including a managed PostgreSQL instance and a Python Web Service container.
+- **Database Engine Migration**: Upgraded SQLAlchemy configuration to dynamically detect and switch from local `sqlite://` to Render's `postgresql://`, ensuring data persistence across ephemeral container deployments. Added `psycopg2-binary` driver.
+- **Unified Full-Stack Routing**: Deprecated Vercel's static routing model. Bound FastAPI's root endpoint (`/`) to explicitly serve `index.html` via `FileResponse`, allowing Render to act as a unified full-stack host.
+
+#### 2. Security & Quality Audit
+
+- **CORS Strategy**: Maintained wildcard `["*"]` for initial deployment flexibility, flagged for restriction to the strict Render app URL in the next production hotfix.
+- **Environment Isolation**: Configured Render environment variables to strictly reject syncing of `GEMINI_API_KEY` and `PINECONE_API_KEY` into public blueprints, forcing secure Dashboard injection.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Database Persistence & User Registration System
 
 **Date:** 2026-04-04
@@ -34,7 +58,7 @@ To ensure production-grade quality and security, all contributors must strictly 
 #### 3. Review Protocol
 
 - **Primary Peer Reviewer**: Ruby (@xxandy-what)
-- **Technical Consultant**: Sean (SeanChen327)
+- **Technical Consultant**: Sean (@SeanChen327)
 
 ---
 
@@ -58,8 +82,8 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 #### 3. Review Protocol
 
-- **Primary Peer Reviewer**: Ruby (xxandy-what)
-- **Technical Consultant**: Sean (SeanChen327)
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
 
 ---
 
@@ -83,8 +107,8 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 #### 3. Review Protocol
 
-- **Primary Peer Reviewer**: Ruby (xxandy-what)
-- **Technical Consultant**: Sean (SeanChen327)
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
 
 ---
 
@@ -108,5 +132,5 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 #### 3. Review Protocol
 
-- **Primary Peer Reviewer**: Ruby (xxandy-what)
-- **Technical Consultant**: Sean (SeanChen327)
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
