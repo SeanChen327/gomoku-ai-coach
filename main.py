@@ -240,7 +240,7 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
 
 # --- API ENDPOINTS ---
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     """
     Lightweight health check endpoint for Keep-Alive Ping (Strategy B).
