@@ -194,32 +194,44 @@ async def get_current_active_user(current_user: UserORM = Depends(get_current_us
 # --- CORE LOGIC FUNCTIONS ---
 
 def analyze_board(board: list[str]) -> str:
-    """Analyzes the 4x4 Tic-Tac-Toe board for immediate tactical threats or winning moves."""
-    win_patterns = [
-        [0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], 
-        [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15], 
-        [0, 5, 10, 15], [3, 6, 9, 12] 
-    ]
-    empty_spots = [str(i) for i, v in enumerate(board) if v == ""]
+    """Analyzes the 15x15 Gomoku board for basic tactical threats."""
+    # This prevents the LLM from trying to parse 225 cells blindly.
+    # We do a quick heuristic scan for any sequences of 4.
+    BOARD_SIZE = 15
+    directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
     
-    for p in win_patterns:
-        line = [board[p[0]], board[p[1]], board[p[2]], board[p[3]]]
-        if line.count("O") == 3 and line.count("") == 1:
-            critical_index = p[line.index("")]
-            return f"[CRITICAL]: Block O at {critical_index} immediately!"
-        if line.count("X") == 3 and line.count("") == 1:
-            win_index = p[line.index("")]
-            return f"[OPPORTUNITY]: Play at {win_index} to win!"
-            
-    return f"[NEUTRAL]: No immediate threats. Safe moves available: {', '.join(empty_spots)}."
+    for r in range(BOARD_SIZE):
+        for c in range(BOARD_SIZE):
+            idx = r * BOARD_SIZE + c
+            player = board[idx]
+            if not player:
+                continue
+                
+            for dr, dc in directions:
+                count = 1
+                for step in range(1, 4):
+                    nr, nc = r + dr * step, c + dc * step
+                    if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
+                        if board[nr * BOARD_SIZE + nc] == player:
+                            count += 1
+                        else:
+                            break
+                    else:
+                        break
+                
+                if count == 4:
+                    if player == "O":
+                        return f"[CRITICAL]: Computer (O) has 4 in a row starting near index {idx}! Block immediately."
+                    if player == "X":
+                        return f"[OPPORTUNITY]: Human (X) has 4 in a row near index {idx}! Push for the win."
+                        
+    return "[NEUTRAL]: No immediate 4-in-a-row threats detected. Focus on building open threes and controlling intersections."
 
 def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
-    """Retrieves expert 4x4 Tic-Tac-Toe strategies from Pinecone vector DB."""
-    center_indices = [5, 6, 9, 10]
-    center_occupants = [board[i] for i in center_indices if board[i] != ""]
-    center_status = "empty" if not center_occupants else f"occupied by {', '.join(set(center_occupants))}"
-        
-    search_query = f"4x4 Board center is {center_status}. User question: {user_message}"
+    """Retrieves expert Gomoku strategies from Pinecone vector DB."""
+    # (Note: For optimal production behavior, you should eventually update setup_db.py 
+    #  to push Gomoku logic instead of 4x4 Tic-Tac-Toe logic into Pinecone).
+    search_query = f"Gomoku 15x15 Strategy. User question: {user_message}"
     
     try:
         query_embedding_result = client.models.embed_content(
@@ -242,10 +254,7 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
-    """
-    Lightweight health check endpoint for Keep-Alive Ping (Strategy B).
-    Returns the current server time to prove the service is online.
-    """
+    """Lightweight health check endpoint for Keep-Alive Ping (Strategy B)."""
     return {
         "status": "online",
         "timestamp": datetime.utcnow().isoformat(),
@@ -254,10 +263,7 @@ async def health_check():
 
 @app.get("/")
 def read_root():
-    """
-    Serves the frontend application interface.
-    This replaces Vercel's static routing, allowing Render to serve full-stack.
-    """
+    """Serves the frontend application interface."""
     if os.path.exists("index.html"):
         return FileResponse("index.html")
     return {"message": "API is running, but index.html was not found."}
@@ -320,14 +326,11 @@ def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_curre
     if request.last_evaluation:
         le = request.last_evaluation
         move_context = f"Player X's last move (Index {le.get('index')}) was algorithmically evaluated as: [{le.get('evaluation_label')}]. Algorithm comment: '{le.get('comment')}'. "
-        if le.get('missed_best_move') != "":
-            move_context += f"They missed the optimal move at index {le.get('missed_best_move')}."
 
     system_prompt = f"""
-    [ROLE]: You are a professional 4x4 Tic-Tac-Toe AI Coach. 
-    Human plays 'X', Computer plays 'O'. Help 'X' defeat 'O'.
+    [ROLE]: You are a professional 15x15 Gomoku (Five-in-a-Row) AI Coach. 
+    Human plays Black stones ('X'), Computer plays White stones ('O').
     
-    [CURRENT BOARD STATE]: {request.board}
     [TACTICAL ANALYSIS]: {tactical_analysis}
     [RECENT MOVE CONTEXT]: {move_context}
     [RAG EXPERT CONTEXT]: {rag_context}
@@ -335,9 +338,9 @@ def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_curre
     User Question: "{request.message}"
     
     [STRICT GUIDELINES]:
-    1. If the user asks about their last move, heavily rely on the [RECENT MOVE CONTEXT] to answer. Translate the algorithmic tag into friendly coaching advice.
-    2. Suggest legal moves based on the Tactical Analysis.
-    3. Keep response concise (under 80 words) and conversational.
+    1. Acknowledge this is Gomoku (15x15 grid), where the goal is 5 stones in a row.
+    2. Do NOT attempt to read the entire 225-cell board blindly. Rely strictly on the [TACTICAL ANALYSIS] and [RECENT MOVE CONTEXT] provided above.
+    3. Keep response concise (under 80 words), encouraging, and conversational.
     """
     
     try:
@@ -358,18 +361,15 @@ async def generate_report(request: GameReportRequest, current_user: UserORM = De
     ])
     
     report_prompt = f"""
-    [TASK]: Provide a brief Executive Summary of this 4x4 Tic-Tac-Toe match.
+    [TASK]: Provide a brief Executive Summary of this 15x15 Gomoku match.
     [FINAL RESULT]: {request.final_result}
     
-    [TAGGED GAME HISTORY]:
-    {history_summary}
+    [TAGGED GAME HISTORY (Sampled)]:
+    {history_summary[-1000:]} # Sending only recent history to avoid token limits
 
     [INSTRUCTIONS]:
-    The provided game history already contains algorithmic evaluations (e.g., MISSED_WIN, CRITICAL_MISTAKE, GOOD_MOVE).
-    Do NOT recalculate the game. Simply summarize the data:
-    1. Overall Assessment (1 sentence).
-    2. Point out the most critical mistake Player X made (if any) based on the tags.
-    3. Point out Player X's best move based on the tags.
+    1. Overall Assessment (1-2 sentences).
+    2. Provide general advice for improving Gomoku gameplay (e.g., focus on open 3s and 4s).
     
     Format nicely with markdown. Limit to 100 words. Keep it professional.
     """

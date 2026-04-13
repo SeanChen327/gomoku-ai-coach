@@ -8,11 +8,36 @@ To ensure production-grade quality and security, all contributors must strictly 
 - **Pull Request (PR) Protocol**: Every PR must include a clear description of the technical changes and any mock data/tests used.
 - **Mandatory Reviewers**:
   - **Ruby (@xxandy-what)** MUST act as the Primary Peer Reviewer. No code is merged without her explicit approval.
-  - **Sean (@hyu010)** MUST be tagged as the Technical Consultant for architectural and security decisions.
+  - **Sean (@SeanChen327)** MUST be tagged as the Technical Consultant for architectural and security decisions.
 
 ---
 
 ## 📖 Decision Log
+
+### Feature: Gomoku 15x15 Migration & Heuristic AI
+
+**Date:** 2026-04-13
+**Branch:** `feature/gomoku-core-logic`
+**Status:** In Progress / Local Testing
+
+#### 1. Technical Decisions
+
+- **Game Engine Overhaul**: Transitioned from a 4x4 Tic-Tac-Toe grid to a 15x15 Gomoku (Five-in-a-Row) board.
+- **AI Algorithm Optimization**: Replaced the Minimax algorithm with a **Heuristic Evaluation Engine**. This prevents the exponential state-space explosion ($225!$) that would occur on a 15x15 grid, ensuring sub-second response times in the browser.
+- **UI/UX Enhancement**: Implemented a wood-textured board with realistic black and white stone rendering for a more authentic Gomoku experience.
+- **Tactical Analysis Engine**: Upgraded the backend `analyze_board` function to recognize Gomoku-specific patterns like "Open Threes" and "Critical Fours" to provide accurate coaching feedback via Gemini.
+
+#### 2. Security & Quality Audit
+
+- **State Integrity**: Maintained consistent API contracts to ensure that existing Gemini and Pinecone integrations function without modification.
+- **Audit Logging**: Maintained strict [SECURITY EVENT] logging in the backend for all game-related actions.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
 
 ### Feature: Automation Keep-Alive Mechanism (Strategy B)
 
