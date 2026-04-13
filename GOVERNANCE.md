@@ -14,6 +14,33 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Report UX and Data Cleansing
+
+**Date:** 2026-04-13
+**Branch:** `feature/report-ux-data-cleansing`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **UX Optimization (Report Modal)**: Disabled the immediate auto-triggering of the Match Report modal when a game concludes. Instead, a manual "View AI Report" button is dynamically injected into the `#status` bar. This allows players to review the final board state without visual obstruction.
+- **API Integrity Maintained**: The manual button directly delegates to the existing `generateMatchReport` async function. No modifications were made to the FastAPI integration or REST API configurations.
+- **CSV Data Cleansing**:
+  - Overhauled the `downloadCSV()` function in `index.html`.
+  - Replaced raw "X" and "O" strings with "Black" and "White" for better domain clarity.
+  - Mathematically transformed the 1D Array indices (0-224) into 2D Gomoku Coordinate notations (e.g., A1, D4) using modulo and base-26 character conversion, drastically improving report readability for humans.
+
+#### 2. Security & Quality Audit
+
+- **DOM Security**: Safe string interpolation was used for injecting the final result string into the button component.
+- **Performance**: Mathematical conversions run entirely client-side via JavaScript without adding computational load to the Render server instance.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Gomoku 15x15 UI/UX Optimization (Coordinates & Grid Fix)
 
 **Date:** 2026-04-13

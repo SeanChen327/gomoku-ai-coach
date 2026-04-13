@@ -23,8 +23,8 @@
         /* ------------------------- */
         .board-wrapper {
             display: grid;
-            grid-template-columns: 30px 525px; /* 严格锁定宽度: 15格 * 35px = 525px */
-            grid-template-rows: 25px 525px;    /* 严格锁定高度 */
+            grid-template-columns: 30px 525px; 
+            grid-template-rows: 25px 525px;    
             margin-top: 10px;
         }
         
@@ -32,7 +32,6 @@
             grid-column: 2;
             display: grid;
             grid-template-columns: repeat(15, 35px);
-            /* 移除了 gap 和 padding，确保对齐且不撑开父容器 */
         }
         .top-coords div {
             text-align: center;
@@ -48,7 +47,6 @@
             grid-column: 1;
             display: grid;
             grid-template-rows: repeat(15, 35px);
-            /* 移除了 gap 和 padding */
         }
         .left-coords div {
             display: flex;
@@ -60,39 +58,33 @@
             font-size: 0.9em;
         }
 
-        /* Gomoku Board Styling - Fixed Grid Lines */
         /* Gomoku Board Styling - Perfect Grid Clipping */
         .board { 
             grid-column: 2;
             display: grid; 
             grid-template-columns: repeat(15, 35px); 
             grid-template-rows: repeat(15, 35px);
-            background-color: #d18b47; /* Wood color */
+            background-color: #d18b47; 
             border-radius: 4px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             position: relative;
             width: 525px; 
             height: 525px;
-            /* 移除了原本在这里的 background-image，防止线条溢出 */
         }
 
-        /* 将网格线限制在内部的 14x14 交叉区域 */
         .board::before {
             content: '';
             position: absolute;
             top: 17px; left: 17px;
-            width: calc(14 * 35px); /* 490px */
-            height: calc(14 * 35px); /* 490px */
-            border: 1px solid rgba(0,0,0,0.6); /* 最外层的黑色封边框 */
-            
-            /* 核心修复：把交叉线放在这个受限的框盒内 */
+            width: calc(14 * 35px); 
+            height: calc(14 * 35px); 
+            border: 1px solid rgba(0,0,0,0.6); 
             background-image: 
                 linear-gradient(rgba(0,0,0,0.6) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0,0,0,0.6) 1px, transparent 1px);
             background-size: 35px 35px;
-            background-position: 0 0; /* 对齐边框的左上角 */
-            
-            pointer-events: none; /* 确保不阻挡底层单元格的点击 */
+            background-position: 0 0; 
+            pointer-events: none; 
             z-index: 1;
         }
         
@@ -105,7 +97,6 @@
             z-index: 2;
         }
         
-        /* 交互优化：鼠标悬浮在交叉点上时显示微弱的光晕 */
         .cell:hover::after {
             content: '';
             position: absolute;
@@ -127,10 +118,11 @@
             transform: translate(-50%, -50%);
             box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
         }
-        .stone-X { background: radial-gradient(circle at 10px 10px, #555, #000); } /* Black Stone */
-        .stone-O { background: radial-gradient(circle at 10px 10px, #fff, #ccc); } /* White Stone */
+        .stone-X { background: radial-gradient(circle at 10px 10px, #555, #000); } 
+        .stone-O { background: radial-gradient(circle at 10px 10px, #fff, #ccc); } 
 
-        #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #dc3545; height: 30px; }
+        /* UX Fix: Adjusted status to comfortably hold a button */
+        #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #dc3545; height: 40px; display: flex; align-items: center; justify-content: center; gap: 15px;}
         
         /* Chat UI Styles */
         #chat-container { position: fixed; bottom: 20px; right: 20px; width: 320px; border: none; border-radius: 12px; background: white; display: none; flex-direction: column; box-shadow: 0 8px 24px rgba(0,0,0,0.15); overflow: hidden; z-index: 900; }
@@ -436,7 +428,6 @@
             let tempBoard = [...prevBoard];
             tempBoard[index] = "X";
             if(checkWinner(tempBoard) === "X") return { label: "winning_move", comment: "Secured the victory!" };
-            // Basic heuristic logging for Gomoku
             return { label: "tactical_move", comment: `Played at Gomoku coordinate (${Math.floor(index/BOARD_SIZE)}, ${index%BOARD_SIZE}).`, missed_best: "" };
         }
 
@@ -477,7 +468,7 @@
             let bestMove;
 
             if (difficulty === "easy") bestMove = getRandomMove();
-            else bestMove = getHeuristicMove(); // Hard uses heuristic for 15x15
+            else bestMove = getHeuristicMove(); 
 
             board[bestMove] = "O";
             recordMove("O", bestMove, prevBoard);
@@ -491,15 +482,13 @@
             return emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
         }
 
-        // Fast Heuristic AI for 15x15 (Replacing Minimax)
         function getHeuristicMove() {
             let bestScore = -Infinity;
             let bestMoves = [];
 
             for (let i = 0; i < TOTAL_CELLS; i++) {
                 if (board[i] === "") {
-                    // Evaluate offensive (O) and defensive (X) values
-                    let score = evaluateCell(i, "O") + evaluateCell(i, "X") * 1.1; // Slightly favor blocking
+                    let score = evaluateCell(i, "O") + evaluateCell(i, "X") * 1.1; 
                     if (score > bestScore) {
                         bestScore = score;
                         bestMoves = [i];
@@ -522,7 +511,6 @@
                 let count = 1;
                 let openEnds = 0;
 
-                // Check forward
                 for (let step = 1; step <= 4; step++) {
                     let nr = r + dr * step;
                     let nc = c + dc * step;
@@ -531,7 +519,6 @@
                     else if (board[nr * BOARD_SIZE + nc] === "") { openEnds++; break; }
                     else break;
                 }
-                // Check backward
                 for (let step = 1; step <= 4; step++) {
                     let nr = r - dr * step;
                     let nc = c - dc * step;
@@ -541,11 +528,11 @@
                     else break;
                 }
 
-                if (count >= 5) return 100000; // Guaranteed win
-                if (count === 4 && openEnds === 2) totalScore += 10000; // Open 4
-                if (count === 4 && openEnds === 1) totalScore += 1000;  // Closed 4
-                if (count === 3 && openEnds === 2) totalScore += 500;   // Open 3
-                if (count === 2 && openEnds === 2) totalScore += 50;    // Open 2
+                if (count >= 5) return 100000; 
+                if (count === 4 && openEnds === 2) totalScore += 10000; 
+                if (count === 4 && openEnds === 1) totalScore += 1000;  
+                if (count === 3 && openEnds === 2) totalScore += 500;   
+                if (count === 2 && openEnds === 2) totalScore += 50;    
                 if (count === 1) totalScore += 5;
             }
             return totalScore;
@@ -556,8 +543,12 @@
             if (result !== null) {
                 gameActive = false;
                 let finalResultString = result === 'tie' ? "Draw" : (result === 'X' ? "Player (Black) Wins" : "Computer (White) Wins");
-                document.getElementById('status').innerText = `Game Over: ${finalResultString}!`;
-                generateMatchReport(finalResultString);
+                
+                // UX FIX: Display the result and append a manual trigger button instead of calling generateMatchReport directly.
+                document.getElementById('status').innerHTML = `
+                    <span>Game Over: ${finalResultString}!</span> 
+                    <button onclick="generateMatchReport('${finalResultString}')" style="padding: 4px 12px; cursor: pointer; font-weight: bold; background: #007bff; color: white; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📊 View AI Report</button>
+                `;
                 return true;
             }
             return false;
@@ -586,7 +577,19 @@
         function downloadCSV() {
             if (gameHistory.length === 0) return alert("No game data to download.");
             let csvContent = "Step,Player,Position,Evaluation_Label,Comment,Missed_Best_Move\n";
-            gameHistory.forEach(row => { csvContent += `${row.step},${row.player},${row.index},${row.evaluation_label},"${row.comment}",${row.missed_best_move}\n`; });
+            
+            gameHistory.forEach(row => { 
+                // DATA CLEANSING: Convert "X"/"O" to "Black"/"White"
+                const playerColor = row.player === "X" ? "Black" : "White";
+                
+                // DATA CLEANSING: Convert board index (0-224) to coordinates (e.g. A1, H8)
+                const r = Math.floor(row.index / BOARD_SIZE);
+                const c = row.index % BOARD_SIZE;
+                const coordinate = String.fromCharCode(65 + c) + (r + 1); // 65 is ASCII for 'A'
+                
+                csvContent += `${row.step},${playerColor},${coordinate},${row.evaluation_label},"${row.comment}",${row.missed_best_move}\n`; 
+            });
+            
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.setAttribute("href", URL.createObjectURL(blob));
