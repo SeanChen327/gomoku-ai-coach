@@ -14,6 +14,29 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Hybrid AI Algorithm for Easy Mode
+
+**Date:** 2026-04-14
+**Branch:** `feature/easy-mode-ai`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Epsilon-Greedy Logic Implementation:** Modified the "Easy" difficulty algorithm in the frontend engine. Introduced `getEasyMove()`, replacing pure randomness (`getRandomMove()`).
+- **Threat-Blocking Enforcement:** Ensured that if the evaluation score exceeds a critical threshold (10000, indicative of immediate loss or win scenarios), the AI will always execute the optimal defensive/offensive move.
+- **Sub-Optimal Blending:** During non-critical board states, forced a 60/40 probability split between random moves and optimal heuristic moves to simulate an entry-level player strategy.
+
+#### 2. Security & Quality Audit
+
+- **Zero API Modification:** Guaranteed absolute isolation from the backend. The core `main.py` files and REST APIs remain untouched.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Heuristic Payload Injection & Frontend Computation Offloading
 
 **Date:** 2026-04-13
