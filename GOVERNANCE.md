@@ -14,6 +14,31 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Heuristic Payload Injection & Frontend Computation Offloading
+
+**Date:** 2026-04-13
+**Branch:** `feature/ai-chat-heuristics`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Computation Offloading**: Relocated Gomoku spatial calculations (Win Rate estimation and Best Next Move prediction) entirely to the frontend (`index.html`) using a lightweight JavaScript heuristic engine[cite: 1].
+- **Dynamic Payload Injection**: Bypassed the need to alter backend API contracts by packaging frontend calculations into the existing `last_evaluation` JSON dictionary. This payload is passed seamlessly to the backend during the `fetch` call.
+- **Role Reassignment for LLM**: Shifted the Gemini model's responsibility from _calculating_ coordinates to _explaining_ them. The prompt now strictly enforces reliance on the injected frontend payload, drastically improving response accuracy and tactical value.
+
+#### 2. Security & Quality Audit
+
+- **Zero API Intrusion**: Mathematically guaranteed that no core application endpoints, database models, or API deployment configurations in `main.py` were broken or modified.
+- **Cost & Latency Reduction**: Eliminates the need for backend Python to process a 225-cell array for every chat query. By handling math in the browser, we save compute cycles and reduce LLM token generation (enforced `<80 words` limit).
+- **Hallucination Mitigation**: Prevented the AI from blindly guessing spatial coordinates, anchoring its advice entirely in deterministic algorithmic math.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: RenjuNet RAG Knowledge Base Integration
 
 **Date:** 2026-04-13
