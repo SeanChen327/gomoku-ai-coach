@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic-Tac-Toe AI Assistant</title>
+    <title>Tic-Tac-Toe AI Assistant (4x4 Edition)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; background-color: #f8f9fa; }
         h1 { color: #343a40; }
         .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; }
-        .board { display: grid; grid-template-columns: repeat(3, 100px); gap: 8px; margin-top: 10px; }
-        .cell { width: 100px; height: 100px; background-color: #ffffff; border: 2px solid #dee2e6; display: flex; justify-content: center; align-items: center; font-size: 2.5em; cursor: pointer; border-radius: 8px; transition: background-color 0.2s; }
+        /* Updated for 4x4 */
+        .board { display: grid; grid-template-columns: repeat(4, 80px); gap: 8px; margin-top: 10px; }
+        .cell { width: 80px; height: 80px; background-color: #ffffff; border: 2px solid #dee2e6; display: flex; justify-content: center; align-items: center; font-size: 2em; cursor: pointer; border-radius: 8px; transition: background-color 0.2s; }
         .cell:hover { background-color: #e9ecef; }
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #dc3545; height: 30px; }
         
@@ -28,7 +29,7 @@
 </head>
 <body>
 
-    <h1>Tic-Tac-Toe AI Coach</h1>
+    <h1>Tic-Tac-Toe AI Coach (4x4)</h1>
     
     <div class="controls">
         <div>
@@ -36,7 +37,7 @@
             <select id="difficulty">
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
-                <option value="hard" selected>Hard (Minimax)</option>
+                <option value="hard" selected>Hard (Minimax w/ Pruning)</option>
             </select>
         </div>
         <button onclick="resetGame()" style="padding: 5px 15px; cursor: pointer;">Reset Game</button>
@@ -54,6 +55,13 @@
         <div class="cell" onclick="makeMove(6)"></div>
         <div class="cell" onclick="makeMove(7)"></div>
         <div class="cell" onclick="makeMove(8)"></div>
+        <div class="cell" onclick="makeMove(9)"></div>
+        <div class="cell" onclick="makeMove(10)"></div>
+        <div class="cell" onclick="makeMove(11)"></div>
+        <div class="cell" onclick="makeMove(12)"></div>
+        <div class="cell" onclick="makeMove(13)"></div>
+        <div class="cell" onclick="makeMove(14)"></div>
+        <div class="cell" onclick="makeMove(15)"></div>
     </div>
 
     <button id="chat-toggle" onclick="toggleChat()">💬 Ask Coach</button>
@@ -63,7 +71,7 @@
             <span style="cursor:pointer" onclick="toggleChat()">×</span>
         </div>
         <div id="chat-history">
-            <div class="msg ai-msg"><strong>Coach:</strong> Hello! I'm your AI assistant. I can analyze the board and help you defeat the computer. Try me!</div>
+            <div class="msg ai-msg"><strong>Coach:</strong> Hello! Welcome to the 4x4 edition. I can analyze the board and help you. Try me!</div>
         </div>
         <div id="chat-input-area">
             <input type="text" id="chat-input" placeholder="Type a question..." onkeydown="if(event.key === 'Enter') sendMessage()">
@@ -72,19 +80,21 @@
     </div>
 
     <script>
-        let board = ["", "", "", "", "", "", "", "", ""];
+        let board = Array(16).fill("");
         let currentPlayer = "X"; 
         let gameActive = true;
 
         function checkWinner(currentBoard) {
+            // 4x4 win patterns
             const winPatterns = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8],
-                [0, 3, 6], [1, 4, 7], [2, 5, 8],
-                [0, 4, 8], [2, 4, 6]
+                [0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], // Rows
+                [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15], // Cols
+                [0, 5, 10, 15], [3, 6, 9, 12] // Diagonals
             ];
             for (let i = 0; i < winPatterns.length; i++) {
-                const [a, b, c] = winPatterns[i];
-                if (currentBoard[a] && currentBoard[a] === currentBoard[b] && currentBoard[a] === currentBoard[c]) {
+                const [a, b, c, d] = winPatterns[i];
+                if (currentBoard[a] && currentBoard[a] === currentBoard[b] && 
+                    currentBoard[a] === currentBoard[c] && currentBoard[a] === currentBoard[d]) {
                     return currentBoard[a]; 
                 }
             }
@@ -100,7 +110,9 @@
                 
                 if (gameActive) {
                     currentPlayer = "O";
-                    setTimeout(computerMove, 400); 
+                    document.getElementById('status').innerText = "Computer is thinking...";
+                    // Slight delay so UI updates before heavy computation
+                    setTimeout(computerMove, 50); 
                 }
             }
         }
@@ -132,6 +144,7 @@
             }
 
             board[bestMove] = "O";
+            document.getElementById('status').innerText = "";
             updateBoard();
             checkGameState();
             currentPlayer = "X";
@@ -145,10 +158,13 @@
         function getBestMove() {
             let bestScore = -Infinity;
             let move;
+            // Depth Limit Set to 5 for 4x4 to prevent browser crash
+            const MAX_DEPTH = 5; 
             for (let i = 0; i < board.length; i++) {
                 if (board[i] === "") {
                     board[i] = "O";
-                    let score = minimax(board, 0, false);
+                    // Using Alpha-Beta Pruning
+                    let score = minimax(board, 0, false, -Infinity, Infinity, MAX_DEPTH);
                     board[i] = "";
                     if (score > bestScore) {
                         bestScore = score;
@@ -156,22 +172,30 @@
                     }
                 }
             }
-            return move;
+            // Fallback if no move is somehow found
+            return move !== undefined ? move : getRandomMove();
         }
 
-        let scores = { "O": 10, "X": -10, "tie": 0 };
-        function minimax(currentBoard, depth, isMaximizing) {
+        // Optimized Minimax with Alpha-Beta Pruning and Depth Limit
+        function minimax(currentBoard, depth, isMaximizing, alpha, beta, maxDepth) {
             let result = checkWinner(currentBoard);
-            if (result !== null) return scores[result];
+            if (result === "O") return 10 - depth;
+            if (result === "X") return depth - 10;
+            if (result === "tie") return 0;
+            
+            // Heuristic evaluation at max depth (neutral 0 for now)
+            if (depth >= maxDepth) return 0;
 
             if (isMaximizing) {
                 let bestScore = -Infinity;
                 for (let i = 0; i < currentBoard.length; i++) {
                     if (currentBoard[i] === "") {
                         currentBoard[i] = "O";
-                        let score = minimax(currentBoard, depth + 1, false);
+                        let score = minimax(currentBoard, depth + 1, false, alpha, beta, maxDepth);
                         currentBoard[i] = "";
                         bestScore = Math.max(score, bestScore);
+                        alpha = Math.max(alpha, score);
+                        if (beta <= alpha) break; // Prune
                     }
                 }
                 return bestScore;
@@ -180,9 +204,11 @@
                 for (let i = 0; i < currentBoard.length; i++) {
                     if (currentBoard[i] === "") {
                         currentBoard[i] = "X";
-                        let score = minimax(currentBoard, depth + 1, true);
+                        let score = minimax(currentBoard, depth + 1, true, alpha, beta, maxDepth);
                         currentBoard[i] = "";
                         bestScore = Math.min(score, bestScore);
+                        beta = Math.min(beta, score);
+                        if (beta <= alpha) break; // Prune
                     }
                 }
                 return bestScore;
@@ -195,7 +221,7 @@
         }
 
         function resetGame() {
-            board = ["", "", "", "", "", "", "", "", ""];
+            board = Array(16).fill("");
             currentPlayer = "X";
             gameActive = true;
             document.getElementById('status').innerText = "";
@@ -221,7 +247,7 @@
                 history.scrollTop = history.scrollHeight;
 
                 const loadingId = "loading-" + Date.now();
-                history.innerHTML += `<div class="msg ai-msg" id="${loadingId}"><strong>Coach:</strong> Thinking...</div>`;
+                history.innerHTML += `<div class="msg ai-msg" id="${loadingId}"><strong>Coach:</strong> Analyzing 4x4 board...</div>`;
                 history.scrollTop = history.scrollHeight;
 
                 try {

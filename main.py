@@ -44,62 +44,67 @@ class ChatRequest(BaseModel):
     Attributes:
         message (str): The user's query or instruction to the AI coach.
         board (list[str]): The current state of the Tic-Tac-Toe board represented 
-                           as a list of 9 strings (e.g., ["X", "O", "", ...]).
+                           as a list of 16 strings (e.g., ["X", "O", "", ...]).
     """
     message: str
     board: list[str]
 
 def analyze_board(board: list[str]) -> str:
     """
-    Analyzes the current Tic-Tac-Toe board and provides tactical advice.
+    Analyzes the current 4x4 Tic-Tac-Toe board and provides tactical advice.
 
     This function identifies immediate winning opportunities or critical threats
-    that need to be blocked. It also filters out unsafe diagonal moves.
+    that need to be blocked by checking all 10 possible winning lines in a 4x4 grid.
 
     Args:
-        board (list[str]): A list of 9 strings representing the board state.
+        board (list[str]): A list of 16 strings representing the 4x4 board state.
 
     Returns:
         str: A formatted string containing tactical advice (CRITICAL, OPPORTUNITY, or NEUTRAL)
              with a list of recommended safe moves.
     """
-    win_patterns = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]]
-    empty_spots = [i for i, v in enumerate(board) if v == ""]
+    # 4x4 Winning Patterns
+    win_patterns = [
+        [0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], # Rows
+        [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15], # Cols
+        [0, 5, 10, 15], [3, 6, 9, 12] # Diagonals
+    ]
+    empty_spots = [str(i) for i, v in enumerate(board) if v == ""]
     
-    # Diagonal Block Logic
-    # If Player is at 0, and Computer is at 4, position 8 is USELESS.
-    forbidden_spots = []
-    if board[0] == "X" and board[4] == "O": forbidden_spots.append(8)
-    if board[2] == "X" and board[4] == "O": forbidden_spots.append(6)
-    if board[6] == "X" and board[4] == "O": forbidden_spots.append(2)
-    if board[8] == "X" and board[4] == "O": forbidden_spots.append(0)
-    
-    # Final safe moves for the AI to recommend
-    safe_moves = [str(i) for i in empty_spots if i not in forbidden_spots]
-
+    # Analyze critical lines (3 of the same, 1 empty)
     for p in win_patterns:
-        line = [board[p[0]], board[p[1]], board[p[2]]]
-        if line.count("O") == 2 and line.count("") == 1:
-            return f"[CRITICAL]: Block O at {p[line.index('')]}!"
-        if line.count("X") == 2 and line.count("") == 1:
-            return f"[OPPORTUNITY]: Win at {p[line.index('')]}!"
+        line = [board[p[0]], board[p[1]], board[p[2]], board[p[3]]]
+        if line.count("O") == 3 and line.count("") == 1:
+            critical_index = p[line.index("")]
+            return f"[CRITICAL]: Block O at {critical_index} immediately!"
+        if line.count("X") == 3 and line.count("") == 1:
+            win_index = p[line.index("")]
+            return f"[OPPORTUNITY]: Play at {win_index} to win!"
             
-    return f"[NEUTRAL]: No immediate threats. STRONGLY RECOMMENDED moves: {', '.join(safe_moves)}. (Avoid blocked diagonals!)"
+    return f"[NEUTRAL]: No immediate threats. Safe moves available: {', '.join(empty_spots)}."
 
 def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
     """
     Retrieves expert Tic-Tac-Toe advice from the Pinecone vector database using RAG.
 
     Args:
-        board (list[str]): The current state of the Tic-Tac-Toe board.
+        board (list[str]): The current state of the Tic-Tac-Toe board (length 16).
         user_message (str): The user's query or prompt.
 
     Returns:
         str: Aggregated context retrieved from the database, or a fallback string
              if no relevant data is found.
     """
-    center_status = board[4] if board[4] else "empty"
-    search_query = f"Board center is {center_status}. User question: {user_message}"
+    # In a 4x4, the center is the 4 inner squares: 5, 6, 9, 10.
+    center_indices = [5, 6, 9, 10]
+    center_occupants = [board[i] for i in center_indices if board[i] != ""]
+    
+    if not center_occupants:
+        center_status = "empty"
+    else:
+        center_status = f"occupied by {', '.join(set(center_occupants))}"
+        
+    search_query = f"4x4 Board center is {center_status}. User question: {user_message}"
     
     query_embedding_result = client.models.embed_content(
         model="gemini-embedding-001",
@@ -127,7 +132,7 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
 @app.post("/api/chat")
 def chat_with_ai(request: ChatRequest) -> dict:
     """
-    API endpoint to interact with the Tic-Tac-Toe AI Coach.
+    API endpoint to interact with the 4x4 Tic-Tac-Toe AI Coach.
 
     Accepts the current board state and a user message, augments the prompt with 
     tactical analysis and RAG context, and returns the LLM's coaching response.
@@ -147,11 +152,11 @@ def chat_with_ai(request: ChatRequest) -> dict:
     
     # English System Prompt
     system_prompt = f"""
-    [ROLE]: You are a professional Tic-Tac-Toe AI Coach. Your ONLY client is the human player.
+    [ROLE]: You are a professional 4x4 Tic-Tac-Toe AI Coach. Your ONLY client is the human player.
     Human plays 'X', Computer plays 'O'. Your mission is to help 'X' defeat 'O'.
     NEVER take the perspective of the computer ('O').
 
-    Current board array (indices 0-8): {current_board}
+    Current 4x4 board array (indices 0-15): {current_board}
     [TACTICAL ANALYSIS (HIGHEST PRIORITY)]: {tactical_analysis}
     [RAG EXPERT CONTEXT]: {rag_context}
     
