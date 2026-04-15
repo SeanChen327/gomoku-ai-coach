@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic-Tac-Toe AI Coach (Strict Mode)</title>
+    <title>Gomoku AI Coach (15x15)</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; background-color: #f8f9fa; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 30px; background-color: #f8f9fa; }
         h1 { color: #343a40; }
         .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; }
         
@@ -18,9 +18,42 @@
         #game-area { display: none; flex-direction: column; align-items: center; width: 100%; }
         #login-prompt { margin-top: 50px; text-align: center; color: #6c757d; }
 
-        .board { display: grid; grid-template-columns: repeat(4, 80px); gap: 8px; margin-top: 10px; }
-        .cell { width: 80px; height: 80px; background-color: #ffffff; border: 2px solid #dee2e6; display: flex; justify-content: center; align-items: center; font-size: 2em; cursor: pointer; border-radius: 8px; transition: background-color 0.2s; }
-        .cell:hover { background-color: #e9ecef; }
+        /* Gomoku Board Styling */
+        .board { 
+            display: grid; 
+            grid-template-columns: repeat(15, 35px); 
+            gap: 1px; 
+            margin-top: 10px; 
+            background-color: #d18b47; /* Wood color */
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .cell { 
+            width: 35px; 
+            height: 35px; 
+            background-color: transparent; 
+            border: 1px solid rgba(0,0,0,0.3); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            font-size: 1.5em; 
+            cursor: pointer; 
+            position: relative;
+        }
+        .cell:hover { background-color: rgba(255,255,255,0.2); }
+        
+        /* Black and White Stones */
+        .stone-X, .stone-O {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+        }
+        .stone-X { background: radial-gradient(circle at 10px 10px, #555, #000); } /* Black Stone */
+        .stone-O { background: radial-gradient(circle at 10px 10px, #fff, #ccc); } /* White Stone */
+
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #dc3545; height: 30px; }
         
         /* Chat UI Styles */
@@ -64,7 +97,7 @@
 </head>
 <body>
 
-    <h1>Tic-Tac-Toe AI Coach (4x4)</h1>
+    <h1>Gomoku AI Coach (15x15)</h1>
     
     <div class="controls">
         <span class="auth-status" id="auth-status-display">Not Logged In</span>
@@ -73,7 +106,7 @@
 
     <div id="login-prompt">
         <h2>👋 Welcome!</h2>
-        <p>Please login or sign up to access the game and AI coaching features.</p>
+        <p>Please login or sign up to access the Gomoku game and AI coaching features.</p>
     </div>
 
     <div id="game-area">
@@ -81,9 +114,8 @@
             <div>
                 <label for="difficulty">Difficulty: </label>
                 <select id="difficulty">
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard" selected>Hard (Minimax w/ Pruning)</option>
+                    <option value="easy">Easy (Random)</option>
+                    <option value="hard" selected>Hard (Heuristic AI)</option>
                 </select>
             </div>
             <button onclick="resetGame()" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">Reset Game</button>
@@ -93,7 +125,7 @@
 
         <div class="board" id="board">
             <script>
-                for(let i=0; i<16; i++) {
+                for(let i=0; i<225; i++) {
                     document.write(`<div class="cell" id="cell-${i}" onclick="makeMove(${i})"></div>`);
                 }
             </script>
@@ -119,34 +151,20 @@
     <div id="auth-modal" class="modal">
         <div class="modal-content auth-form-container">
             <h2 id="auth-title" style="margin-top:0; color:#343a40; text-align: center;">🔐 Login</h2>
-            
             <div id="auth-alert" class="alert-box"></div>
-
             <div id="login-form">
-                <div class="form-group">
-                    <input type="text" id="login-username" placeholder="Username">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key === 'Enter') executeLogin()">
-                </div>
+                <div class="form-group"><input type="text" id="login-username" placeholder="Username"></div>
+                <div class="form-group"><input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key === 'Enter') executeLogin()"></div>
                 <button class="btn btn-primary" onclick="executeLogin()">Login</button>
                 <span class="auth-toggle-link" onclick="switchAuthView('register')">Don't have an account? Sign Up</span>
             </div>
-
             <div id="register-form" style="display: none;">
-                <div class="form-group">
-                    <input type="text" id="register-username" placeholder="Choose a Username">
-                </div>
-                <div class="form-group">
-                    <input type="email" id="register-email" placeholder="Email Address">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="register-password" placeholder="Create Password" onkeydown="if(event.key === 'Enter') executeRegister()">
-                </div>
+                <div class="form-group"><input type="text" id="register-username" placeholder="Choose a Username"></div>
+                <div class="form-group"><input type="email" id="register-email" placeholder="Email Address"></div>
+                <div class="form-group"><input type="password" id="register-password" placeholder="Create Password" onkeydown="if(event.key === 'Enter') executeRegister()"></div>
                 <button class="btn btn-success" onclick="executeRegister()">Create Account</button>
                 <span class="auth-toggle-link" onclick="switchAuthView('login')">Already have an account? Login</span>
             </div>
-
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
             <button class="btn close-btn" onclick="closeAuthModal()">Cancel</button>
         </div>
@@ -183,7 +201,6 @@
                 statusDisplay.style.background = "#d4edda";
                 actionBtn.innerText = "Logout";
                 actionBtn.onclick = executeLogout;
-                
                 gameArea.style.display = "flex";
                 loginPrompt.style.display = "none";
                 chatToggle.style.display = "block";
@@ -192,7 +209,6 @@
                 statusDisplay.style.background = "#f8d7da";
                 actionBtn.innerText = "Login / Sign Up";
                 actionBtn.onclick = () => openAuthModal('login');
-                
                 gameArea.style.display = "none";
                 loginPrompt.style.display = "block";
                 chatToggle.style.display = "none";
@@ -200,7 +216,6 @@
             }
         }
 
-        // --- MODAL & UI LOGIC ---
         function showAlert(message, type) {
             const alertBox = document.getElementById('auth-alert');
             alertBox.innerText = message;
@@ -232,15 +247,11 @@
             hideAlert();
         }
 
-        // --- API CALLS ---
         async function executeRegister() {
             const user = document.getElementById('register-username').value.trim();
             const email = document.getElementById('register-email').value.trim();
             const pass = document.getElementById('register-password').value.trim();
-
-            if (!user || !email || !pass) {
-                return showAlert("All fields are required.", "error");
-            }
+            if (!user || !email || !pass) return showAlert("All fields are required.", "error");
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/register`, {
@@ -248,20 +259,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: user, email: email, password: pass })
                 });
-
                 const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.detail || "Registration failed");
-                }
-
+                if (!response.ok) throw new Error(data.detail || "Registration failed");
                 showAlert("Account created successfully! Please login.", "success");
-                
-                // Pre-fill login and switch view
                 document.getElementById('login-username').value = user;
-                document.getElementById('login-password').value = ""; // Force them to type password
+                document.getElementById('login-password').value = ""; 
                 setTimeout(() => switchAuthView('login'), 1500);
-
             } catch (error) {
                 showAlert(error.message, "error");
             }
@@ -270,7 +273,6 @@
         async function executeLogin() {
             const user = document.getElementById('login-username').value.trim();
             const pass = document.getElementById('login-password').value.trim();
-            
             if (!user || !pass) return showAlert("Username and password required.", "error");
 
             const params = new URLSearchParams();
@@ -283,11 +285,8 @@
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: params
                 });
-                
                 const data = await response.json();
-                
                 if (!response.ok) throw new Error(data.detail || "Authentication failed");
-                
                 localStorage.setItem('access_token', data.access_token);
                 closeAuthModal();
                 checkAuthState();
@@ -303,39 +302,37 @@
 
         window.onload = checkAuthState;
 
-        // --- FULL CORE GAME ENGINE ---
-        let board = Array(16).fill("");
-        let currentPlayer = "X"; 
+        // --- GOMOKU (15x15) CORE GAME ENGINE ---
+        const BOARD_SIZE = 15;
+        const TOTAL_CELLS = 225;
+        let board = Array(TOTAL_CELLS).fill("");
+        let currentPlayer = "X"; // User is Black (X), AI is White (O)
         let gameActive = true;
         let gameHistory = [];
         let stepCount = 1;
 
-        const WIN_PATTERNS = [
-            [0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15],
-            [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15],
-            [0, 5, 10, 15], [3, 6, 9, 12] 
-        ];
-
         function checkWinner(currentBoard) {
-            for (let i = 0; i < WIN_PATTERNS.length; i++) {
-                const [a, b, c, d] = WIN_PATTERNS[i];
-                if (currentBoard[a] && currentBoard[a] === currentBoard[b] && 
-                    currentBoard[a] === currentBoard[c] && currentBoard[a] === currentBoard[d]) {
-                    return currentBoard[a]; 
+            const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    let idx = r * BOARD_SIZE + c;
+                    let player = currentBoard[idx];
+                    if (!player) continue;
+
+                    for (let [dr, dc] of directions) {
+                        let count = 1;
+                        for (let step = 1; step < 5; step++) {
+                            let nr = r + dr * step;
+                            let nc = c + dc * step;
+                            if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                            if (currentBoard[nr * BOARD_SIZE + nc] === player) count++;
+                            else break;
+                        }
+                        if (count >= 5) return player;
+                    }
                 }
             }
             if (!currentBoard.includes("")) return "tie";
-            return null;
-        }
-
-        function findImmediateWin(currentBoard, player) {
-            for(let i=0; i<16; i++) {
-                if(currentBoard[i] === "") {
-                    let tempBoard = [...currentBoard];
-                    tempBoard[i] = player;
-                    if(checkWinner(tempBoard) === player) return i;
-                }
-            }
             return null;
         }
 
@@ -343,15 +340,8 @@
             let tempBoard = [...prevBoard];
             tempBoard[index] = "X";
             if(checkWinner(tempBoard) === "X") return { label: "winning_move", comment: "Secured the victory!" };
-
-            let missedWin = findImmediateWin(prevBoard, "X");
-            if(missedWin !== null && missedWin !== index) return { label: "missed_win", missed_best: missedWin, comment: `Missed immediate win at ${missedWin}.` };
-
-            let missedBlock = findImmediateWin(prevBoard, "O");
-            if(missedBlock !== null && missedBlock !== index) return { label: "critical_mistake", missed_best: missedBlock, comment: `Failed to block O at ${missedBlock}.` };
-
-            if([5, 6, 9, 10].includes(index)) return { label: "good_move", comment: "Controlled the center." };
-            return { label: "standard_move", comment: "Standard positional play." };
+            // Basic heuristic logging for Gomoku
+            return { label: "tactical_move", comment: `Played at Gomoku coordinate (${Math.floor(index/BOARD_SIZE)}, ${index%BOARD_SIZE}).`, missed_best: "" };
         }
 
         function recordMove(player, index, prevBoard) {
@@ -391,8 +381,7 @@
             let bestMove;
 
             if (difficulty === "easy") bestMove = getRandomMove();
-            else if (difficulty === "medium") bestMove = Math.random() > 0.5 ? getBestMove() : getRandomMove();
-            else bestMove = getBestMove(); // Hard
+            else bestMove = getHeuristicMove(); // Hard uses heuristic for 15x15
 
             board[bestMove] = "O";
             recordMove("O", bestMove, prevBoard);
@@ -406,62 +395,71 @@
             return emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
         }
 
-        function getBestMove() {
+        // Fast Heuristic AI for 15x15 (Replacing Minimax)
+        function getHeuristicMove() {
             let bestScore = -Infinity;
-            let move;
-            const MAX_DEPTH = 5; 
-            for (let i = 0; i < board.length; i++) {
+            let bestMoves = [];
+
+            for (let i = 0; i < TOTAL_CELLS; i++) {
                 if (board[i] === "") {
-                    board[i] = "O";
-                    let score = minimax(board, 0, false, -Infinity, Infinity, MAX_DEPTH);
-                    board[i] = "";
-                    if (score > bestScore) { bestScore = score; move = i; }
+                    // Evaluate offensive (O) and defensive (X) values
+                    let score = evaluateCell(i, "O") + evaluateCell(i, "X") * 1.1; // Slightly favor blocking
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [i];
+                    } else if (score === bestScore) {
+                        bestMoves.push(i);
+                    }
                 }
             }
-            return move !== undefined ? move : getRandomMove();
+            if (bestMoves.length === 0) return getRandomMove();
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
         }
 
-        function minimax(currentBoard, depth, isMaximizing, alpha, beta, maxDepth) {
-            let result = checkWinner(currentBoard);
-            if (result === "O") return 10 - depth;
-            if (result === "X") return depth - 10;
-            if (result === "tie") return 0;
-            if (depth >= maxDepth) return 0;
+        function evaluateCell(index, player) {
+            const r = Math.floor(index / BOARD_SIZE);
+            const c = index % BOARD_SIZE;
+            const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+            let totalScore = 0;
 
-            if (isMaximizing) {
-                let bestScore = -Infinity;
-                for (let i = 0; i < currentBoard.length; i++) {
-                    if (currentBoard[i] === "") {
-                        currentBoard[i] = "O";
-                        let score = minimax(currentBoard, depth + 1, false, alpha, beta, maxDepth);
-                        currentBoard[i] = "";
-                        bestScore = Math.max(score, bestScore);
-                        alpha = Math.max(alpha, score);
-                        if (beta <= alpha) break; 
-                    }
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                let openEnds = 0;
+
+                // Check forward
+                for (let step = 1; step <= 4; step++) {
+                    let nr = r + dr * step;
+                    let nc = c + dc * step;
+                    if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                    if (board[nr * BOARD_SIZE + nc] === player) count++;
+                    else if (board[nr * BOARD_SIZE + nc] === "") { openEnds++; break; }
+                    else break;
                 }
-                return bestScore;
-            } else {
-                let bestScore = Infinity;
-                for (let i = 0; i < currentBoard.length; i++) {
-                    if (currentBoard[i] === "") {
-                        currentBoard[i] = "X";
-                        let score = minimax(currentBoard, depth + 1, true, alpha, beta, maxDepth);
-                        currentBoard[i] = "";
-                        bestScore = Math.min(score, bestScore);
-                        beta = Math.min(beta, score);
-                        if (beta <= alpha) break; 
-                    }
+                // Check backward
+                for (let step = 1; step <= 4; step++) {
+                    let nr = r - dr * step;
+                    let nc = c - dc * step;
+                    if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+                    if (board[nr * BOARD_SIZE + nc] === player) count++;
+                    else if (board[nr * BOARD_SIZE + nc] === "") { openEnds++; break; }
+                    else break;
                 }
-                return bestScore;
+
+                if (count >= 5) return 100000; // Guaranteed win
+                if (count === 4 && openEnds === 2) totalScore += 10000; // Open 4
+                if (count === 4 && openEnds === 1) totalScore += 1000;  // Closed 4
+                if (count === 3 && openEnds === 2) totalScore += 500;   // Open 3
+                if (count === 2 && openEnds === 2) totalScore += 50;    // Open 2
+                if (count === 1) totalScore += 5;
             }
+            return totalScore;
         }
 
         function checkGameState() {
             let result = checkWinner(board);
             if (result !== null) {
                 gameActive = false;
-                let finalResultString = result === 'tie' ? "Draw" : `Player ${result} Wins`;
+                let finalResultString = result === 'tie' ? "Draw" : (result === 'X' ? "Player (Black) Wins" : "Computer (White) Wins");
                 document.getElementById('status').innerText = `Game Over: ${finalResultString}!`;
                 generateMatchReport(finalResultString);
                 return true;
@@ -471,17 +469,23 @@
 
         function updateBoard() {
             const cells = document.querySelectorAll('.cell');
-            board.forEach((val, i) => cells[i].innerText = val);
+            board.forEach((val, i) => {
+                cells[i].innerHTML = "";
+                if (val === "X") cells[i].innerHTML = "<div class='stone-X'></div>";
+                if (val === "O") cells[i].innerHTML = "<div class='stone-O'></div>";
+            });
         }
 
         function resetGame() {
-            board = Array(16).fill("");
+            board = Array(TOTAL_CELLS).fill("");
             currentPlayer = "X";
             gameActive = true;
             gameHistory = [];
             stepCount = 1;
             document.getElementById('status').innerText = "";
             updateBoard();
+            
+            // AI goes first on Hard to prevent first-move advantage for human in Gomoku (Optional, but let's keep Human first)
         }
 
         // --- FULL CSV & AI REPORT ---
@@ -492,7 +496,7 @@
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.setAttribute("href", URL.createObjectURL(blob));
-            link.setAttribute("download", `TicTacToe_Report_${new Date().getTime()}.csv`);
+            link.setAttribute("download", `Gomoku_Report_${new Date().getTime()}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -518,10 +522,7 @@
                     body: JSON.stringify({ history: gameHistory, final_result: finalResult }) 
                 });
                 
-                if (response.status === 401) {
-                    executeLogout();
-                    throw new Error("Session expired. Please login again.");
-                }
+                if (response.status === 401) { executeLogout(); throw new Error("Session expired. Please login again."); }
                 if (!response.ok) throw new Error(`Server returned ${response.status}`);
                 
                 const data = await response.json();
