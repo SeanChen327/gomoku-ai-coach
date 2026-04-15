@@ -6,6 +6,7 @@ from typing import Optional, Any, Dict
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from google import genai 
 from google.genai.types import EmbedContentConfig
@@ -27,11 +28,16 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # --- DATABASE CONFIGURATION ---
-# Using SQLite for local development. Easy migration to PostgreSQL later.
-SQLALCHEMY_DATABASE_URL = "sqlite:///./tictactoe.db"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Dynamically switch between SQLite (local) and PostgreSQL (Render)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tictactoe.db")
+
+# Fix for SQLAlchemy 1.4+ which dropped support for 'postgres://' URI scheme
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -50,6 +56,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# Note: For strict production, allowed origins should be limited to the exact Render domain.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -72,7 +79,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 if not GEMINI_API_KEY or not PINECONE_API_KEY:
     logger.error("Critical API Keys are missing in .env file.")
-    raise ValueError("API Keys are missing. Please set them in your .env file.")
+    raise ValueError("API Keys are missing. Please set them in your environment.")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -233,17 +240,23 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
 
 # --- API ENDPOINTS ---
 
+@app.get("/")
+def read_root():
+    """
+    Serves the frontend application interface.
+    This replaces Vercel's static routing, allowing Render to serve full-stack.
+    """
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"message": "API is running, but index.html was not found."}
+
 @app.post("/api/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    """
-    Registers a new user and persists data to SQLite.
-    """
-    # Check if username exists
+    """Registers a new user and persists data to PostgreSQL/SQLite."""
     db_user = db.query(UserORM).filter(UserORM.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
-    # Check if email exists
     db_email = db.query(UserORM).filter(UserORM.email == user.email).first()
     if db_email:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -263,9 +276,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/api/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """
-    Authenticates a user against the database and returns a JWT access token.
-    """
+    """Authenticates a user against the database and returns a JWT access token."""
     user = db.query(UserORM).filter(UserORM.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -318,7 +329,6 @@ def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_curre
     """
     
     try:
-        # Switching back to gemini-2.0-flash or gemini-1.5-flash as per the decision log for rate limits
         response = client.models.generate_content(model='gemini-2.5-flash', contents=system_prompt)
         return {"reply": response.text}
     except Exception as e:
