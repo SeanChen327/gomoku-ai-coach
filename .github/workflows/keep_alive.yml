@@ -1,0 +1,33 @@
+# ---------------------------------------------------------
+# Project: Gomoku AI Coach (15x15)
+# Feature: Strategy B (Keep-Alive Mechanism)
+# ---------------------------------------------------------
+
+name: Render Keep-Alive Automation
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping_service:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Stealth Health Check
+        env:
+          RENDER_APP_URL: "https://tictactoe-preview-service.onrender.com"
+        run: |
+          echo "Sending keep-alive request to $RENDER_APP_URL/api/health"
+
+          STATUSCODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            "$RENDER_APP_URL/api/health")
+
+          echo "HTTP Response Code: $STATUSCODE"
+
+          if [ "$STATUSCODE" -ne 200 ]; then
+            echo "Error: Health check failed with status $STATUSCODE"
+            exit 1
+          fi
+          echo "Service is awake."
