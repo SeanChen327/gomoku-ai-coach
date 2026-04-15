@@ -14,6 +14,30 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Rich CSV Reporting & Heuristic Enhancement
+
+**Date:** 2026-04-14
+**Branch:** `feature/rich-csv-reporting`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Heuristic Comparison Logic**: implemented `evaluatePlayerMove` in `index.html` to compare the player's move score against the optimal move score calculated by the frontend engine.
+- **Dynamic Metadata Generation**: Introduced qualitative labels (`Blunder`, `Critical`, `Strong Move`, etc.) and contextual comments to replace static coordinate strings in the CSV export.
+- **Missed Opportunity Tracking**: Added logic to capture and log the `Missed_Best_Move` coordinate when a player ignores a critical tactical threat (score >= 10000).
+
+#### 2. Security & Quality Audit
+
+- **Zero API Modification**: Mathematically guaranteed no changes to `main.py` or existing REST API contracts.
+- **State Integrity**: Used temporary board cloning during heuristic evaluation to prevent state pollution in the active game.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Hybrid AI Algorithm for Easy Mode
 
 **Date:** 2026-04-14

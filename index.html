@@ -435,16 +435,84 @@
             return null;
         }
 
+        /**
+         * Evaluates the human player's move against the frontend heuristic engine
+         * to generate rich, contextual metadata for the CSV report.
+         * * @param {number} index - The 1D array index where the player moved.
+         * @param {Array<string>} prevBoard - The board state strictly before the move.
+         * @returns {Object} Dictionary containing label, comment, and missed best move.
+         */
         function evaluatePlayerMove(index, prevBoard) {
             let tempBoard = [...prevBoard];
             tempBoard[index] = "X";
-            if(checkWinner(tempBoard) === "X") return { label: "winning_move", comment: "Secured the victory!" };
-            return { label: "tactical_move", comment: `Played at coordinate ${indexToCoord(index)}.`, missed_best: "" };
+            
+            // 1. Check for immediate victory
+            if(checkWinner(tempBoard) === "X") {
+                return { label: "Brilliant 🏆", comment: "Flawless execution! Secured the victory.", missed_best: "" };
+            }
+
+            // 2. Temporarily revert global board to 'prevBoard' state to run pure heuristics
+            let currentBoardState = [...board];
+            board = [...prevBoard]; 
+            
+            let bestIndex = getBestMoveForPlayer("X");
+            let chosenScore = evaluateCell(index, "X") * 1.1 + evaluateCell(index, "O");
+            let bestScore = bestIndex !== null ? (evaluateCell(bestIndex, "X") * 1.1 + evaluateCell(bestIndex, "O")) : 0;
+            
+            // Restore global board state immediately
+            board = [...currentBoardState];
+
+            let label = "Standard Move";
+            let comment = `Played at coordinate ${indexToCoord(index)}.`;
+            let missed = "";
+
+            // 3. Heuristic Comparison Logic
+            if (bestScore >= 10000 && chosenScore < 10000) {
+                label = "Blunder";
+                comment = "Missed a critical threat! Left a lethal opening or missed an immediate win.";
+                missed = indexToCoord(bestIndex); // Log the exact coordinate they should have played
+            } else if (chosenScore >= 10000) {
+                label = "Critical";
+                comment = "Crucial move! Successfully blocked a lethal threat or created an unstoppable attack.";
+            } else if (chosenScore >= 1000) {
+                label = "Strong Move";
+                comment = "Excellent placement. Created a strong offensive pattern (e.g., Open Three).";
+            } else if (chosenScore >= 500) {
+                label = "Good Move";
+                comment = "Solid positional play. Building structural advantage and controlling intersections.";
+            } else {
+                label = "Standard Move";
+                comment = "Developing stones. Keep a close eye on the opponent's defensive structures.";
+            }
+
+            return { label: label, comment: comment, missed_best: missed };
         }
 
+        /**
+         * Records a move into the game history with rich heuristic context.
+         * Includes dynamically generated flavor text for Computer moves as well.
+         * * @param {string} player - "X" for Human, "O" for Computer.
+         * @param {number} index - The 1D array index of the move.
+         * @param {Array<string>} prevBoard - The board state strictly before the move.
+         * 根据落子的启发式得分，将其分为 Blunder(严重失误/漏杀)、
+         * Critical(关键防守/绝杀)、Strong Move(优势拓展)、Good Move(常规好棋) 等。
+         */
         function recordMove(player, index, prevBoard) {
-            let evaluation = { label: "computer_move", comment: "AI Calculation", missed_best: "" };
-            if (player === "X") evaluation = evaluatePlayerMove(index, prevBoard);
+            let evaluation = { label: "System", comment: "AI Calculation", missed_best: "" };
+            
+            if (player === "X") {
+                evaluation = evaluatePlayerMove(index, prevBoard);
+            } else {
+                // Give the Computer's moves contextual flavor based on its own heuristic score
+                let aiScore = evaluateCell(index, "O") * 1.1 + evaluateCell(index, "X");
+                if (aiScore >= 10000) {
+                    evaluation = { label: "Lethal Strike", comment: "AI executed a high-priority tactical maneuver.", missed_best: "" };
+                } else if (aiScore >= 1000) {
+                    evaluation = { label: "Aggressive Expansion", comment: "AI is building a strong offensive shape.", missed_best: "" };
+                } else {
+                    evaluation = { label: "Positional Play", comment: "AI is fighting for board control.", missed_best: "" };
+                }
+            }
             
             gameHistory.push({
                 step: stepCount++,
