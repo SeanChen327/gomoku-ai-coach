@@ -181,7 +181,7 @@
             <div>
                 <label for="difficulty">Difficulty: </label>
                 <select id="difficulty">
-                    <option value="easy">Easy (Random)</option>
+                    <option value="easy">Easy (Hybrid AI)</option>
                     <option value="hard" selected>Hard (Heuristic AI)</option>
                 </select>
             </div>
@@ -478,7 +478,7 @@
             let difficulty = document.getElementById('difficulty').value;
             let bestMove;
 
-            if (difficulty === "easy") bestMove = getRandomMove();
+            if (difficulty === "easy") bestMove = getEasyMove();
             else bestMove = getHeuristicMove(); 
 
             board[bestMove] = "O";
@@ -488,11 +488,52 @@
             if(!checkGameState()) currentPlayer = "X";
         }
 
+        /**
+         * Selects a purely random move from available empty spaces.
+         * * @returns {number} 1D array index of the selected random move.
+         */
         function getRandomMove() {
             let emptyIndices = board.map((v, i) => v === "" ? i : null).filter(v => v !== null);
             return emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
         }
 
+        /**
+         * Calculates a semi-intelligent move for the Easy difficulty.
+         * Prioritizes blocking critical threats or securing immediate wins (Score >= 10000).
+         * Otherwise, it blends random moves with heuristic optimal moves to simulate a beginner player.
+         * * @returns {number} 1D array index of the chosen move.
+         */
+        function getEasyMove() {
+            let bestScore = -Infinity;
+            let bestMoves = [];
+
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                if (board[i] === "") {
+                    // Evaluate offensive (own) score and defensive (block) score
+                    let score = evaluateCell(i, "O") + evaluateCell(i, "X") * 1.1; 
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [i];
+                    } else if (score === bestScore) {
+                        bestMoves.push(i);
+                    }
+                }
+            }
+
+            // If there's an immediate win or a critical threat to block (score >= 10000)
+            // Or roughly 40% of the time, we play smart.
+            if (bestScore >= 10000 || Math.random() < 0.4) {
+                return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+            } else {
+                // 60% of the time (when there's no immediate critical threat), play completely randomly.
+                return getRandomMove();
+            }
+        }
+
+        /**
+         * Evaluates the board and returns the most optimal heuristic move.
+         * * @returns {number} 1D array index of the best tactical move.
+         */
         function getHeuristicMove() {
             let bestScore = -Infinity;
             let bestMoves = [];
@@ -524,7 +565,6 @@
 
             for (let i = 0; i < TOTAL_CELLS; i++) {
                 if (board[i] === "") {
-                    // Evaluate offensive (own) score and defensive (block) score
                     let score = evaluateCell(i, playerTarget) * 1.1 + evaluateCell(i, opponent);
                     if (score > bestScore) {
                         bestScore = score;
@@ -551,7 +591,6 @@
                     scoreO += evaluateCell(i, "O");
                 }
             }
-            // Smooth out early game volatility with a base coefficient
             if (scoreX === 0 && scoreO === 0) return 50; 
             
             let baseSmoothing = 1000; 
@@ -720,14 +759,23 @@
                 try {
                     const lastPlayerMove = [...gameHistory].reverse().find(m => m.player === "X");
                     
-                    // --- DYNAMIC PAYLOAD INJECTION (NO API MODIFICATION) ---
-                    // We utilize the existing 'Optional[Dict]' structure to pass frontend calculations
                     let evaluationPayload = lastPlayerMove ? { ...lastPlayerMove } : { label: "game_start", comment: "Game just started." };
                     
-                    const bestNextIndex = getBestMoveForPlayer("X");
-                    evaluationPayload.suggested_next_move = indexToCoord(bestNextIndex);
-                    evaluationPayload.win_rate = calculateWinRate() + "%";
-                    // ---------------------------------------------------------
+                    if (!gameActive) {
+                        evaluationPayload.suggested_next_move = "None. The game is already over.";
+                        let finalResult = checkWinner(board);
+                        if (finalResult === "X") {
+                            evaluationPayload.win_rate = "100% (Victory)";
+                        } else if (finalResult === "O") {
+                            evaluationPayload.win_rate = "0% (Defeat)";
+                        } else {
+                            evaluationPayload.win_rate = "50% (Draw)";
+                        }
+                    } else {
+                        const bestNextIndex = getBestMoveForPlayer("X");
+                        evaluationPayload.suggested_next_move = indexToCoord(bestNextIndex);
+                        evaluationPayload.win_rate = calculateWinRate() + "%";
+                    }
 
                     const response = await fetch(`${API_BASE_URL}/api/chat`, {
                         method: 'POST',
