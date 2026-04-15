@@ -240,6 +240,18 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
 
 # --- API ENDPOINTS ---
 
+@app.api_route("/api/health", methods=["GET", "HEAD"])
+async def health_check():
+    """
+    Lightweight health check endpoint for Keep-Alive Ping (Strategy B).
+    Returns the current server time to prove the service is online.
+    """
+    return {
+        "status": "online",
+        "timestamp": datetime.utcnow().isoformat(),
+        "message": "AI Coach is awake and ready."
+    }
+
 @app.get("/")
 def read_root():
     """

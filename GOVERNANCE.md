@@ -14,6 +14,30 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Automation Keep-Alive Mechanism (Strategy B)
+
+**Date:** 2026-04-05
+**Branch:** `feature/keep-alive-strategy-b`
+**Status:** Implemented / Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Infrastructure Optimization**: Implemented a "Keep-Alive" strategy to mitigate Render's free-tier hibernation policy, which typically causes a 50-60 second cold start delay after 15 minutes of inactivity.
+- **Health Check Endpoint**: Developed a lightweight `/api/health` endpoint in `main.py` that returns minimal JSON (status and timestamp). This design ensures that periodic pings do not trigger heavy database or AI logic, maintaining near-zero resource consumption.
+- **External Orchestration**: Recommended the use of an external uptime monitoring service (e.g., UptimeRobot) to trigger the health check endpoint every 10-15 minutes, ensuring the instance remains in an "Active" state.
+
+#### 2. Security & Quality Audit
+
+- **Resource Efficiency**: Verified that the health check route avoids SQLAlchemy sessions and Gemini API calls, preventing unnecessary infrastructure load.
+- **Security Perimeter**: The `/api/health` route is public and read-only. It does not expose environment variables, user data, or sensitive system internals.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Cloud Native Deployment Architecture (Render + PostgreSQL)
 
 **Date:** 2026-04-04
