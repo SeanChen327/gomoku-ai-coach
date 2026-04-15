@@ -14,6 +14,31 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: User Authentication & Zero-Trust API Lockdown
+
+**Date:** 2026-04-03
+**Branch:** `feature/user-authentication`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Authentication Standard**: Implemented OAuth2 password flow with JWT (JSON Web Tokens) to secure backend resources.
+- **Zero-Trust UI**: Engineered a strict UI state machine. The game board and AI interfaces are completely hidden (`display: none`) until a valid JWT is detected in `localStorage`.
+- **API Lockdown**: Secured FastAPI endpoints (`/api/chat`, `/api/generate-report`) using `Depends(get_current_active_user)`, mathematically guaranteeing zero unauthorized API quota consumption.
+- **Vercel Deployment Hotfix**: Explicitly pinned `bcrypt<4.0.0` in `requirements.txt`. This resolved a critical serverless initialization crash (`ValueError: password cannot be longer than 72 bytes` and `AttributeError`) caused by `passlib` failing its internal wrap bug detection against `bcrypt 4.x`.
+
+#### 2. Security & Quality Audit
+
+- **Audit Logging**: Injected explicit server-side logging (`logger.info`) to track the exact identity of users triggering expensive LLM calls.
+- **Environment Resiliency**: Upgraded `API_BASE_URL` resolution in `index.html` to natively support offline `file:///` protocol testing without triggering CORS/Network errors.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (xxandy-what)
+- **Technical Consultant**: Sean (SeanChen327)
+
+---
+
 ### Feature: AI Game Report System (Hybrid Intelligence Architecture)
 
 **Date:** 2026-04-02

@@ -3,11 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic-Tac-Toe AI Assistant (4x4 Edition)</title>
+    <title>Tic-Tac-Toe AI Coach (Strict Mode)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; background-color: #f8f9fa; }
         h1 { color: #343a40; }
         .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; }
+        
+        /* Auth UI */
+        .auth-status { font-weight: bold; padding: 5px 10px; border-radius: 5px; background: #e9ecef; }
+        .auth-btn { padding: 5px 15px; cursor: pointer; font-weight: bold; background: #343a40; color: white; border: none; border-radius: 4px; }
+        .auth-btn:hover { background: #23272b; }
+
+        /* 方案 B：初始隐藏游戏区域 */
+        #game-area { display: none; flex-direction: column; align-items: center; width: 100%; }
+        #login-prompt { margin-top: 50px; text-align: center; color: #6c757d; }
+
         .board { display: grid; grid-template-columns: repeat(4, 80px); gap: 8px; margin-top: 10px; }
         .cell { width: 80px; height: 80px; background-color: #ffffff; border: 2px solid #dee2e6; display: flex; justify-content: center; align-items: center; font-size: 2em; cursor: pointer; border-radius: 8px; transition: background-color 0.2s; }
         .cell:hover { background-color: #e9ecef; }
@@ -25,15 +35,20 @@
         .ai-msg { color: #0056b3; }
         .user-msg { color: #212529; }
 
-        /* Report Modal Styles */
-        #report-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        #report-content { background: white; padding: 30px; border-radius: 12px; width: 80%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        #report-text { white-space: pre-wrap; font-size: 1.05em; line-height: 1.6; color: #333; max-height: 50vh; overflow-y: auto; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;}
-        .modal-actions { display: flex; justify-content: space-between; align-items: center; }
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 80%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
         .btn { padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; border: none; }
+        #login-content { max-width: 400px; }
+        .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .form-group input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+        #report-text { white-space: pre-wrap; font-size: 1.05em; line-height: 1.6; color: #333; max-height: 50vh; overflow-y: auto; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;}
+        .btn-primary { background: #007bff; color: white; width: 100%; margin-bottom: 10px;}
+        .btn-primary:hover { background: #0056b3; }
         .btn-download { background: #28a745; color: white; }
         .btn-download:hover { background: #218838; }
-        .close-btn { background: #dc3545; color: white; }
+        .close-btn { background: #dc3545; color: white; width: 100%;}
         .close-btn:hover { background: #c82333; }
     </style>
 </head>
@@ -42,28 +57,41 @@
     <h1>Tic-Tac-Toe AI Coach (4x4)</h1>
     
     <div class="controls">
-        <div>
-            <label for="difficulty">Difficulty: </label>
-            <select id="difficulty">
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard" selected>Hard (Minimax w/ Pruning)</option>
-            </select>
+        <span class="auth-status" id="auth-status-display">Not Logged In</span>
+        <button class="auth-btn" id="auth-action-btn" onclick="openLoginModal()">Login</button>
+    </div>
+
+    <div id="login-prompt">
+        <h2>👋 Welcome!</h2>
+        <p>Please login to access the game and AI coaching features.</p>
+    </div>
+
+    <div id="game-area">
+        <div class="controls">
+            <div>
+                <label for="difficulty">Difficulty: </label>
+                <select id="difficulty">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard" selected>Hard (Minimax w/ Pruning)</option>
+                </select>
+            </div>
+            <button onclick="resetGame()" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">Reset Game</button>
         </div>
-        <button onclick="resetGame()" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">Reset Game</button>
+
+        <div id="status"></div>
+
+        <div class="board" id="board">
+            <script>
+                for(let i=0; i<16; i++) {
+                    document.write(`<div class="cell" id="cell-${i}" onclick="makeMove(${i})"></div>`);
+                }
+            </script>
+        </div>
+
+        <button id="chat-toggle" onclick="toggleChat()">💬 Ask Coach</button>
     </div>
 
-    <div id="status"></div>
-
-    <div class="board" id="board">
-        <script>
-            for(let i=0; i<16; i++) {
-                document.write(`<div class="cell" id="cell-${i}" onclick="makeMove(${i})"></div>`);
-            }
-        </script>
-    </div>
-
-    <button id="chat-toggle" onclick="toggleChat()">💬 Ask Coach</button>
     <div id="chat-container">
         <div id="chat-header">
             <span>AI Coach</span>
@@ -78,27 +106,107 @@
         </div>
     </div>
 
-    <div id="report-modal">
-        <div id="report-content">
+    <div id="login-modal" class="modal">
+        <div class="modal-content" id="login-content">
+            <h2 style="margin-top:0; color:#343a40;">🔐 User Login</h2>
+            <div id="login-error" style="color: red; margin-bottom: 10px; display: none;">Invalid credentials</div>
+            <div class="form-group">
+                <input type="text" id="login-username" placeholder="Username (admin)">
+            </div>
+            <div class="form-group">
+                <input type="password" id="login-password" placeholder="Password (secret123)" onkeydown="if(event.key === 'Enter') executeLogin()">
+            </div>
+            <button class="btn btn-primary" onclick="executeLogin()">Login</button>
+            <button class="btn close-btn" onclick="closeLoginModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="report-modal" class="modal">
+        <div class="modal-content">
             <h2 style="margin-top:0; color:#007bff;">📊 AI Post-Match Report</h2>
             <div id="report-text">Generating AI Executive Summary... Please wait.</div>
             <div class="modal-actions">
-                <button class="btn btn-download" onclick="downloadCSV()">📥 Download Match Data (CSV)</button>
-                <button class="btn close-btn" onclick="closeReport()">Close & Play Again</button>
+                <button class="btn btn-download" style="width: auto;" onclick="downloadCSV()">📥 Download Match Data (CSV)</button>
+                <button class="btn close-btn" style="width: auto;" onclick="closeReport()">Close & Play Again</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 核心更新：环境自动检测 ---
-        const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+        // --- 核心配置 ---
+        const API_BASE_URL = (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
             ? "http://127.0.0.1:8000" 
             : "";
 
+        // --- AUTHENTICATION ENGINE ---
+        function checkAuthState() {
+            const token = localStorage.getItem('access_token');
+            const statusDisplay = document.getElementById('auth-status-display');
+            const actionBtn = document.getElementById('auth-action-btn');
+            const gameArea = document.getElementById('game-area');
+            const loginPrompt = document.getElementById('login-prompt');
+            const chatToggle = document.getElementById('chat-toggle');
+            
+            if (token) {
+                statusDisplay.innerText = "✅ Logged In";
+                statusDisplay.style.background = "#d4edda";
+                actionBtn.innerText = "Logout";
+                actionBtn.onclick = executeLogout;
+                
+                gameArea.style.display = "flex";
+                loginPrompt.style.display = "none";
+                chatToggle.style.display = "block";
+            } else {
+                statusDisplay.innerText = "❌ Not Logged In";
+                statusDisplay.style.background = "#f8d7da";
+                actionBtn.innerText = "Login";
+                actionBtn.onclick = openLoginModal;
+                
+                gameArea.style.display = "none";
+                loginPrompt.style.display = "block";
+                chatToggle.style.display = "none";
+                document.getElementById('chat-container').style.display = 'none';
+            }
+        }
+
+        function openLoginModal() { document.getElementById('login-modal').style.display = "flex"; document.getElementById('login-error').style.display = "none"; }
+        function closeLoginModal() { document.getElementById('login-modal').style.display = "none"; }
+
+        async function executeLogin() {
+            const user = document.getElementById('login-username').value;
+            const pass = document.getElementById('login-password').value;
+            const errorDiv = document.getElementById('login-error');
+            const params = new URLSearchParams();
+            params.append('username', user);
+            params.append('password', pass);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+                if (!response.ok) throw new Error("Authentication failed");
+                const data = await response.json();
+                localStorage.setItem('access_token', data.access_token);
+                closeLoginModal();
+                checkAuthState();
+            } catch (error) {
+                errorDiv.style.display = "block";
+            }
+        }
+
+        function executeLogout() {
+            localStorage.removeItem('access_token');
+            checkAuthState();
+        }
+
+        window.onload = checkAuthState;
+
+        // --- FULL CORE GAME ENGINE ---
         let board = Array(16).fill("");
         let currentPlayer = "X"; 
         let gameActive = true;
-        
         let gameHistory = [];
         let stepCount = 1;
 
@@ -120,7 +228,6 @@
             return null;
         }
 
-        // --- Heuristic Engine for Real-Time Tagging ---
         function findImmediateWin(currentBoard, player) {
             for(let i=0; i<16; i++) {
                 if(currentBoard[i] === "") {
@@ -138,27 +245,19 @@
             if(checkWinner(tempBoard) === "X") return { label: "winning_move", comment: "Secured the victory!" };
 
             let missedWin = findImmediateWin(prevBoard, "X");
-            if(missedWin !== null && missedWin !== index) {
-                return { label: "missed_win", missed_best: missedWin, comment: `Missed immediate win at ${missedWin}.` };
-            }
+            if(missedWin !== null && missedWin !== index) return { label: "missed_win", missed_best: missedWin, comment: `Missed immediate win at ${missedWin}.` };
 
             let missedBlock = findImmediateWin(prevBoard, "O");
-            if(missedBlock !== null && missedBlock !== index) {
-                return { label: "critical_mistake", missed_best: missedBlock, comment: `Failed to block O at ${missedBlock}.` };
-            }
+            if(missedBlock !== null && missedBlock !== index) return { label: "critical_mistake", missed_best: missedBlock, comment: `Failed to block O at ${missedBlock}.` };
 
             if([5, 6, 9, 10].includes(index)) return { label: "good_move", comment: "Controlled the center." };
-
             return { label: "standard_move", comment: "Standard positional play." };
         }
 
         function recordMove(player, index, prevBoard) {
             let evaluation = { label: "computer_move", comment: "AI Calculation", missed_best: "" };
+            if (player === "X") evaluation = evaluatePlayerMove(index, prevBoard);
             
-            if (player === "X") {
-                evaluation = evaluatePlayerMove(index, prevBoard);
-            }
-
             gameHistory.push({
                 step: stepCount++,
                 player: player,
@@ -193,80 +292,13 @@
 
             if (difficulty === "easy") bestMove = getRandomMove();
             else if (difficulty === "medium") bestMove = Math.random() > 0.5 ? getBestMove() : getRandomMove();
-            else bestMove = getBestMove();
+            else bestMove = getBestMove(); // Hard
 
             board[bestMove] = "O";
             recordMove("O", bestMove, prevBoard);
             document.getElementById('status').innerText = "";
             updateBoard();
-            
             if(!checkGameState()) currentPlayer = "X";
-        }
-
-        function checkGameState() {
-            let result = checkWinner(board);
-            if (result !== null) {
-                gameActive = false;
-                const statusDiv = document.getElementById('status');
-                let finalResultString = result === 'tie' ? "Draw" : `Player ${result} Wins`;
-                statusDiv.innerText = `Game Over: ${finalResultString}!`;
-                
-                generateMatchReport(finalResultString);
-                return true;
-            }
-            return false;
-        }
-
-        // --- CSV Export Engine ---
-        function downloadCSV() {
-            if (gameHistory.length === 0) return alert("No game data to download.");
-            
-            let csvContent = "Step,Player,Position,Evaluation_Label,Comment,Missed_Best_Move\n";
-            
-            gameHistory.forEach(row => {
-                let safeComment = `"${row.comment}"`; 
-                csvContent += `${row.step},${row.player},${row.index},${row.evaluation_label},${safeComment},${row.missed_best_move}\n`;
-            });
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `TicTacToe_Report_${new Date().getTime()}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        async function generateMatchReport(finalResult) {
-            const modal = document.getElementById('report-modal');
-            const reportText = document.getElementById('report-text');
-            modal.style.display = "flex";
-            reportText.innerHTML = "<em>Analyzing your tagged JSON logic and compiling summary...</em>";
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/generate-report`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        history: gameHistory,
-                        final_result: finalResult
-                    })
-                });
-                
-                if (!response.ok) throw new Error(`Server returned ${response.status}`);
-                
-                const data = await response.json();
-                reportText.innerText = data.report_text;
-            } catch (error) {
-                console.error("Report Generation Error:", error);
-                reportText.innerHTML = `<span style="color:red;">Error generating summary. Ensure backend is running.</span><br><br><small>You can still download the CSV data using the green button below.</small>`;
-            }
-        }
-
-        function closeReport() {
-            document.getElementById('report-modal').style.display = "none";
-            resetGame();
         }
 
         function getRandomMove() {
@@ -283,10 +315,7 @@
                     board[i] = "O";
                     let score = minimax(board, 0, false, -Infinity, Infinity, MAX_DEPTH);
                     board[i] = "";
-                    if (score > bestScore) {
-                        bestScore = score;
-                        move = i;
-                    }
+                    if (score > bestScore) { bestScore = score; move = i; }
                 }
             }
             return move !== undefined ? move : getRandomMove();
@@ -328,6 +357,18 @@
             }
         }
 
+        function checkGameState() {
+            let result = checkWinner(board);
+            if (result !== null) {
+                gameActive = false;
+                let finalResultString = result === 'tie' ? "Draw" : `Player ${result} Wins`;
+                document.getElementById('status').innerText = `Game Over: ${finalResultString}!`;
+                generateMatchReport(finalResultString);
+                return true;
+            }
+            return false;
+        }
+
         function updateBoard() {
             const cells = document.querySelectorAll('.cell');
             board.forEach((val, i) => cells[i].innerText = val);
@@ -343,6 +384,60 @@
             updateBoard();
         }
 
+        // --- FULL CSV & AI REPORT ---
+        function downloadCSV() {
+            if (gameHistory.length === 0) return alert("No game data to download.");
+            let csvContent = "Step,Player,Position,Evaluation_Label,Comment,Missed_Best_Move\n";
+            gameHistory.forEach(row => { csvContent += `${row.step},${row.player},${row.index},${row.evaluation_label},"${row.comment}",${row.missed_best_move}\n`; });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.setAttribute("href", URL.createObjectURL(blob));
+            link.setAttribute("download", `TicTacToe_Report_${new Date().getTime()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function generateMatchReport(finalResult) {
+            const token = localStorage.getItem('access_token');
+            const modal = document.getElementById('report-modal');
+            const reportText = document.getElementById('report-text');
+            modal.style.display = "flex";
+
+            if (!token) {
+                reportText.innerHTML = `<span style="color:red;">⚠️ Authentication Required.</span>`;
+                return;
+            }
+
+            reportText.innerHTML = "<em>Analyzing your tagged JSON logic and compiling summary...</em>";
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/generate-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    // 修复点：这里传了真正的 gameHistory
+                    body: JSON.stringify({ history: gameHistory, final_result: finalResult }) 
+                });
+                
+                if (response.status === 401) {
+                    executeLogout();
+                    throw new Error("Session expired. Please login again.");
+                }
+                if (!response.ok) throw new Error(`Server returned ${response.status}`);
+                
+                const data = await response.json();
+                reportText.innerText = data.report_text;
+            } catch (error) {
+                reportText.innerHTML = `<span style="color:red;">Error: ${error.message}</span>`;
+            }
+        }
+
+        function closeReport() {
+            document.getElementById('report-modal').style.display = "none";
+            resetGame();
+        }
+
+        // --- CHAT MODULE ---
         function toggleChat() {
             const chatBox = document.getElementById('chat-container');
             const toggleBtn = document.getElementById('chat-toggle');
@@ -352,6 +447,7 @@
         }
 
         async function sendMessage() {
+            const token = localStorage.getItem('access_token');
             const input = document.getElementById('chat-input');
             const history = document.getElementById('chat-history');
             const message = input.value.trim();
@@ -361,29 +457,31 @@
                 input.value = "";
                 history.scrollTop = history.scrollHeight;
 
+                if (!token) {
+                    history.innerHTML += `<div class="msg ai-msg"><strong style="color:red;">System:</strong> Please login first.</div>`;
+                    history.scrollTop = history.scrollHeight;
+                    return;
+                }
+
                 const loadingId = "loading-" + Date.now();
-                history.innerHTML += `<div class="msg ai-msg" id="${loadingId}"><strong>Coach:</strong> Analyzing board and history...</div>`;
+                history.innerHTML += `<div class="msg ai-msg" id="${loadingId}"><strong>Coach:</strong> Analyzing board...</div>`;
                 history.scrollTop = history.scrollHeight;
 
                 try {
                     const lastPlayerMove = [...gameHistory].reverse().find(m => m.player === "X");
-
                     const response = await fetch(`${API_BASE_URL}/api/chat`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            message: message, 
-                            board: board,
-                            last_evaluation: lastPlayerMove || null
-                        })
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ message: message, board: board, last_evaluation: lastPlayerMove || null })
                     });
                     
-                    if (!response.ok) throw new Error(`Server returned ${response.status}`);
+                    if (response.status === 401) { executeLogout(); throw new Error("Session expired."); }
+                    if (!response.ok) throw new Error(`Error ${response.status}`);
                     
                     const data = await response.json();
                     document.getElementById(loadingId).innerHTML = `<strong>Coach:</strong> ${data.reply}`;
                 } catch (error) {
-                    document.getElementById(loadingId).innerHTML = `<strong style="color:red;">Coach:</strong> Connection Error.`;
+                    document.getElementById(loadingId).innerHTML = `<strong style="color:red;">Coach:</strong> ${error.message}`;
                 }
                 history.scrollTop = history.scrollHeight;
             }
