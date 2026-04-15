@@ -14,11 +14,36 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Gomoku 15x15 UI/UX Optimization (Coordinates & Grid Fix)
+
+**Date:** 2026-04-13
+**Branch:** `feature/board-coordinates-ui`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Coordinate System Implementation**: Added a CSS Grid-based coordinate wrapper (A-O, 1-15) to the game board. This ensures users can accurately communicate move locations to the AI Coach.
+- **Visual Logic Refactoring (Intersections)**: Corrected the stone placement logic. Stones are now visually rendered at the **intersections** of grid lines rather than inside cells, adhering to standard Gomoku/Go rules.
+- **Grid Bleeding Fix**: Utilized CSS `::before` pseudo-elements to strictly constrain grid lines within the 14x14 interior play area, eliminating line overflow at the board edges.
+- **Zero-Logic Intrusion**: Verified that all UI changes are localized to CSS/HTML and do not impact the existing FastAPI backend or Gemini/Pinecone integration contracts.
+
+#### 2. Security & Quality Audit
+
+- **Responsiveness**: Maintained fixed dimensions (525px) for the board to ensure consistent coordinate alignment across different browser viewports.
+- **Event Delegation**: Maintained the 35px click-box size for `.cell` elements to ensure high touch/click tolerance while visually snapping stones to intersections.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Gomoku 15x15 Migration & Heuristic AI
 
 **Date:** 2026-04-13
 **Branch:** `feature/gomoku-core-logic`
-**Status:** In Progress / Local Testing
+**Status:** Pending Peer Review
 
 #### 1. Technical Decisions
 
@@ -43,7 +68,7 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 **Date:** 2026-04-05
 **Branch:** `feature/keep-alive-strategy-b`
-**Status:** Implemented / Pending Peer Review
+**Status:** Pending Peer Review
 
 #### 1. Technical Decisions
 

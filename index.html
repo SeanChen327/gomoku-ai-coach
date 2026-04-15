@@ -18,30 +18,104 @@
         #game-area { display: none; flex-direction: column; align-items: center; width: 100%; }
         #login-prompt { margin-top: 50px; text-align: center; color: #6c757d; }
 
-        /* Gomoku Board Styling */
+        /* ------------------------- */
+        /* UI Update: Board Wrappers */
+        /* ------------------------- */
+        .board-wrapper {
+            display: grid;
+            grid-template-columns: 30px 525px; /* 严格锁定宽度: 15格 * 35px = 525px */
+            grid-template-rows: 25px 525px;    /* 严格锁定高度 */
+            margin-top: 10px;
+        }
+        
+        .top-coords {
+            grid-column: 2;
+            display: grid;
+            grid-template-columns: repeat(15, 35px);
+            /* 移除了 gap 和 padding，确保对齐且不撑开父容器 */
+        }
+        .top-coords div {
+            text-align: center;
+            font-weight: bold;
+            color: #6c757d;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .left-coords {
+            grid-column: 1;
+            display: grid;
+            grid-template-rows: repeat(15, 35px);
+            /* 移除了 gap 和 padding */
+        }
+        .left-coords div {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-weight: bold;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        /* Gomoku Board Styling - Fixed Grid Lines */
+        /* Gomoku Board Styling - Perfect Grid Clipping */
         .board { 
+            grid-column: 2;
             display: grid; 
             grid-template-columns: repeat(15, 35px); 
-            gap: 1px; 
-            margin-top: 10px; 
+            grid-template-rows: repeat(15, 35px);
             background-color: #d18b47; /* Wood color */
-            padding: 8px;
             border-radius: 4px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: relative;
+            width: 525px; 
+            height: 525px;
+            /* 移除了原本在这里的 background-image，防止线条溢出 */
         }
+
+        /* 将网格线限制在内部的 14x14 交叉区域 */
+        .board::before {
+            content: '';
+            position: absolute;
+            top: 17px; left: 17px;
+            width: calc(14 * 35px); /* 490px */
+            height: calc(14 * 35px); /* 490px */
+            border: 1px solid rgba(0,0,0,0.6); /* 最外层的黑色封边框 */
+            
+            /* 核心修复：把交叉线放在这个受限的框盒内 */
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.6) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.6) 1px, transparent 1px);
+            background-size: 35px 35px;
+            background-position: 0 0; /* 对齐边框的左上角 */
+            
+            pointer-events: none; /* 确保不阻挡底层单元格的点击 */
+            z-index: 1;
+        }
+        
         .cell { 
             width: 35px; 
             height: 35px; 
             background-color: transparent; 
-            border: 1px solid rgba(0,0,0,0.3); 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            font-size: 1.5em; 
-            cursor: pointer; 
             position: relative;
+            cursor: pointer; 
+            z-index: 2;
         }
-        .cell:hover { background-color: rgba(255,255,255,0.2); }
+        
+        /* 交互优化：鼠标悬浮在交叉点上时显示微弱的光晕 */
+        .cell:hover::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px; height: 12px;
+            background-color: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            pointer-events: none;
+        }
         
         /* Black and White Stones */
         .stone-X, .stone-O {
@@ -49,6 +123,8 @@
             height: 28px;
             border-radius: 50%;
             position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
             box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
         }
         .stone-X { background: radial-gradient(circle at 10px 10px, #555, #000); } /* Black Stone */
@@ -123,12 +199,32 @@
 
         <div id="status"></div>
 
-        <div class="board" id="board">
-            <script>
-                for(let i=0; i<225; i++) {
-                    document.write(`<div class="cell" id="cell-${i}" onclick="makeMove(${i})"></div>`);
-                }
-            </script>
+        <div class="board-wrapper">
+            <div></div> 
+            
+            <div class="top-coords">
+                <script>
+                    for(let i=0; i<15; i++) {
+                        document.write(`<div>${String.fromCharCode(65 + i)}</div>`);
+                    }
+                </script>
+            </div>
+            
+            <div class="left-coords">
+                <script>
+                    for(let i=0; i<15; i++) {
+                        document.write(`<div>${i + 1}</div>`);
+                    }
+                </script>
+            </div>
+
+            <div class="board" id="board">
+                <script>
+                    for(let i=0; i<225; i++) {
+                        document.write(`<div class="cell" id="cell-${i}" onclick="makeMove(${i})"></div>`);
+                    }
+                </script>
+            </div>
         </div>
 
         <button id="chat-toggle" onclick="toggleChat()">💬 Ask Coach</button>
@@ -484,8 +580,6 @@
             stepCount = 1;
             document.getElementById('status').innerText = "";
             updateBoard();
-            
-            // AI goes first on Hard to prevent first-move advantage for human in Gomoku (Optional, but let's keep Human first)
         }
 
         // --- FULL CSV & AI REPORT ---
