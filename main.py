@@ -28,10 +28,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # --- DATABASE CONFIGURATION ---
-# Dynamically switch between SQLite (local) and PostgreSQL (Render)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tictactoe.db")
 
-# Fix for SQLAlchemy 1.4+ which dropped support for 'postgres://' URI scheme
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -51,12 +49,10 @@ class UserORM(Base):
     hashed_password = Column(String)
     disabled = Column(Boolean, default=False)
 
-# Create tables in the database
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Note: For strict production, allowed origins should be limited to the exact Render domain.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -89,37 +85,30 @@ pinecone_index = pc.Index("tictactoe-rag")
 # --- DATA MODELS (Pydantic) ---
 
 class Token(BaseModel):
-    """Token model for authentication responses."""
     access_token: str
     token_type: str
 
 class TokenData(BaseModel):
-    """Data extracted from the JWT token."""
     username: Optional[str] = None
 
 class UserCreate(BaseModel):
-    """Schema for user registration."""
     username: str
     password: str
     email: EmailStr
 
 class UserOut(BaseModel):
-    """Schema for returning user data securely (excluding password)."""
     username: str
     email: str
     disabled: bool
-    
     class Config:
         from_attributes = True
 
 class ChatRequest(BaseModel):
-    """Request schema for AI Chat."""
     message: str
     board: list[str]
     last_evaluation: Optional[Dict[str, Any]] = None
 
 class Move(BaseModel):
-    """Schema representing a single game move."""
     step: int
     player: str
     index: int
@@ -129,7 +118,6 @@ class Move(BaseModel):
     missed_best_move: Any = ""
 
 class GameReportRequest(BaseModel):
-    """Request schema for generating an AI match report."""
     history: list[Move]
     final_result: str
 
@@ -137,7 +125,6 @@ class GameReportRequest(BaseModel):
 # --- UTILITIES & DEPENDENCIES ---
 
 def get_db():
-    """Dependency to yield a database session."""
     db = SessionLocal()
     try:
         yield db
@@ -145,15 +132,12 @@ def get_db():
         db.close()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies a plain-text password against a hashed password."""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """Hashes a plain-text password using bcrypt."""
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Creates a JWT access token."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -164,7 +148,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserORM:
-    """Validates the provided JWT token and returns the corresponding user from DB."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -185,7 +168,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 async def get_current_active_user(current_user: UserORM = Depends(get_current_user)) -> UserORM:
-    """Ensures the current authenticated user is active."""
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
@@ -194,9 +176,6 @@ async def get_current_active_user(current_user: UserORM = Depends(get_current_us
 # --- CORE LOGIC FUNCTIONS ---
 
 def analyze_board(board: list[str]) -> str:
-    """Analyzes the 15x15 Gomoku board for basic tactical threats."""
-    # This prevents the LLM from trying to parse 225 cells blindly.
-    # We do a quick heuristic scan for any sequences of 4.
     BOARD_SIZE = 15
     directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
     
@@ -228,9 +207,6 @@ def analyze_board(board: list[str]) -> str:
     return "[NEUTRAL]: No immediate 4-in-a-row threats detected. Focus on building open threes and controlling intersections."
 
 def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
-    """Retrieves expert Gomoku strategies from Pinecone vector DB."""
-    # (Note: For optimal production behavior, you should eventually update setup_db.py 
-    #  to push Gomoku logic instead of 4x4 Tic-Tac-Toe logic into Pinecone).
     search_query = f"Gomoku 15x15 Strategy. User question: {user_message}"
     
     try:
@@ -254,7 +230,6 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
-    """Lightweight health check endpoint for Keep-Alive Ping (Strategy B)."""
     return {
         "status": "online",
         "timestamp": datetime.utcnow().isoformat(),
@@ -263,14 +238,12 @@ async def health_check():
 
 @app.get("/")
 def read_root():
-    """Serves the frontend application interface."""
     if os.path.exists("index.html"):
         return FileResponse("index.html")
     return {"message": "API is running, but index.html was not found."}
 
 @app.post("/api/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    """Registers a new user and persists data to PostgreSQL/SQLite."""
     db_user = db.query(UserORM).filter(UserORM.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -280,11 +253,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
         
     hashed_pwd = get_password_hash(user.password)
-    new_user = UserORM(
-        username=user.username, 
-        email=user.email, 
-        hashed_password=hashed_pwd
-    )
+    new_user = UserORM(username=user.username, email=user.email, hashed_password=hashed_pwd)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -294,7 +263,6 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/api/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """Authenticates a user against the database and returns a JWT access token."""
     user = db.query(UserORM).filter(UserORM.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -304,28 +272,31 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/users/me", response_model=UserOut)
 async def read_users_me(current_user: UserORM = Depends(get_current_active_user)):
-    """Returns the currently authenticated user's profile."""
     return current_user
 
 @app.post("/api/chat")
 def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_current_active_user)) -> dict:
-    """Handles user queries to the AI Coach using tactical analysis and RAG."""
     logger.info(f"[SECURITY EVENT] User '{current_user.username}' requested AI chat.")
     
     tactical_analysis = analyze_board(request.board)
     rag_context = retrieve_from_pinecone(request.board, request.message)
     
+    # --- HEURISTIC DATA INJECTION DECODING ---
     move_context = ""
     if request.last_evaluation:
         le = request.last_evaluation
-        move_context = f"Player X's last move (Index {le.get('index')}) was algorithmically evaluated as: [{le.get('evaluation_label')}]. Algorithm comment: '{le.get('comment')}'. "
+        move_context = f"Player X's last move (Index {le.get('index', 'N/A')}) was evaluated as: [{le.get('evaluation_label', 'N/A')}]. Comment: '{le.get('comment', 'N/A')}'. "
+        
+        # Inject dynamic frontend metrics safely if they exist
+        if le.get('suggested_next_move'):
+            move_context += f"Frontend Heuristic Engine strictly calculates Player X's best tactical next move is coordinate {le.get('suggested_next_move')}. "
+        if le.get('win_rate'):
+            move_context += f"Player X's dynamically calculated win rate is currently {le.get('win_rate')}. "
 
     system_prompt = f"""
     [ROLE]: You are a professional 15x15 Gomoku (Five-in-a-Row) AI Coach. 
@@ -339,8 +310,11 @@ def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_curre
     
     [STRICT GUIDELINES]:
     1. Acknowledge this is Gomoku (15x15 grid), where the goal is 5 stones in a row.
-    2. Do NOT attempt to read the entire 225-cell board blindly. Rely strictly on the [TACTICAL ANALYSIS] and [RECENT MOVE CONTEXT] provided above.
-    3. Keep response concise (under 80 words), encouraging, and conversational.
+    2. Only rely on the metrics provided in [RECENT MOVE CONTEXT]. Do not hallucinate coordinates or win rates on your own.
+    3. If asked about the LAST MOVE: Evaluate it based on the recent move comment.
+    4. If asked about the NEXT MOVE: State the suggested coordinate provided in the context, and act creatively as the coach to explain *why* it is strategically strong (e.g., blocking the opponent, creating an open three, securing an intersection).
+    5. If asked about the WIN RATE: Output the precise percentage provided in the context, followed by brief encouraging feedback based on whether it is high or low.
+    6. Keep the response highly encouraging, conversational, and under 80 words.
     """
     
     try:
@@ -352,7 +326,6 @@ def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_curre
 
 @app.post("/api/generate-report")
 async def generate_report(request: GameReportRequest, current_user: UserORM = Depends(get_current_active_user)):
-    """Generates an executive summary of the game using an LLM."""
     logger.info(f"[SECURITY EVENT] User '{current_user.username}' requested match report generation.")
     
     history_summary = "\n".join([
@@ -365,11 +338,11 @@ async def generate_report(request: GameReportRequest, current_user: UserORM = De
     [FINAL RESULT]: {request.final_result}
     
     [TAGGED GAME HISTORY (Sampled)]:
-    {history_summary[-1000:]} # Sending only recent history to avoid token limits
+    {history_summary[-1000:]}
 
     [INSTRUCTIONS]:
     1. Overall Assessment (1-2 sentences).
-    2. Provide general advice for improving Gomoku gameplay (e.g., focus on open 3s and 4s).
+    2. Provide general advice for improving Gomoku gameplay.
     
     Format nicely with markdown. Limit to 100 words. Keep it professional.
     """

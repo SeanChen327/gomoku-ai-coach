@@ -121,7 +121,6 @@
         .stone-X { background: radial-gradient(circle at 10px 10px, #555, #000); }
         .stone-O { background: radial-gradient(circle at 10px 10px, #fff, #ccc); }
 
-        /* UX Fix: Increased height slightly to accommodate the new report button without shifting layout */
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #dc3545; height: 40px; display: flex; align-items: center; justify-content: center; gap: 15px;}
         
         /* Chat UI Styles */
@@ -228,7 +227,7 @@
             <span style="cursor:pointer" onclick="toggleChat()">×</span>
         </div>
         <div id="chat-history">
-            <div class="msg ai-msg"><strong>Coach:</strong> Hello! Try asking me "How was my last move?"</div>
+            <div class="msg ai-msg"><strong>Coach:</strong> Hello! Try asking me "How was my last move?", "What's my win rate?", or "Where should I play next?"</div>
         </div>
         <div id="chat-input-area">
             <input type="text" id="chat-input" placeholder="Type a question..." onkeydown="if(event.key === 'Enter') sendMessage()">
@@ -399,6 +398,18 @@
         let gameHistory = [];
         let stepCount = 1;
 
+        /**
+         * Converts a 1D array index to a 2D Gomoku Coordinate (e.g., A1, H8).
+         * @param {number} index - 1D array index (0-224).
+         * @returns {string} Standard coordinate string.
+         */
+        function indexToCoord(index) {
+            if (index === null || index === undefined || index < 0) return "N/A";
+            const colChar = String.fromCharCode(65 + (index % BOARD_SIZE));
+            const rowNum = Math.floor(index / BOARD_SIZE) + 1;
+            return `${colChar}${rowNum}`;
+        }
+
         function checkWinner(currentBoard) {
             const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
             for (let r = 0; r < BOARD_SIZE; r++) {
@@ -428,7 +439,7 @@
             let tempBoard = [...prevBoard];
             tempBoard[index] = "X";
             if(checkWinner(tempBoard) === "X") return { label: "winning_move", comment: "Secured the victory!" };
-            return { label: "tactical_move", comment: `Played at Gomoku coordinate (${Math.floor(index/BOARD_SIZE)}, ${index%BOARD_SIZE}).`, missed_best: "" };
+            return { label: "tactical_move", comment: `Played at coordinate ${indexToCoord(index)}.`, missed_best: "" };
         }
 
         function recordMove(player, index, prevBoard) {
@@ -501,6 +512,55 @@
             return bestMoves[Math.floor(Math.random() * bestMoves.length)];
         }
 
+        /**
+         * Calculates the best possible next move for a specific player (Client-side logic).
+         * @param {string} playerTarget - "X" or "O".
+         * @returns {number|null} 1D array index of the best move.
+         */
+        function getBestMoveForPlayer(playerTarget) {
+            let opponent = playerTarget === "X" ? "O" : "X";
+            let bestScore = -Infinity;
+            let bestMoves = [];
+
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                if (board[i] === "") {
+                    // Evaluate offensive (own) score and defensive (block) score
+                    let score = evaluateCell(i, playerTarget) * 1.1 + evaluateCell(i, opponent);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [i];
+                    } else if (score === bestScore) {
+                        bestMoves.push(i);
+                    }
+                }
+            }
+            if (bestMoves.length === 0) return null;
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        /**
+         * Dynamically calculates an estimated win rate for Player (X) based on heuristic scores.
+         * @returns {number} Percentage value (1 to 99).
+         */
+        function calculateWinRate() {
+            let scoreX = 0;
+            let scoreO = 0;
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                if (board[i] === "") {
+                    scoreX += evaluateCell(i, "X");
+                    scoreO += evaluateCell(i, "O");
+                }
+            }
+            // Smooth out early game volatility with a base coefficient
+            if (scoreX === 0 && scoreO === 0) return 50; 
+            
+            let baseSmoothing = 1000; 
+            let totalScore = scoreX + scoreO + baseSmoothing;
+            let rawWinRate = ((scoreX + (baseSmoothing / 2)) / totalScore) * 100;
+            
+            return Math.round(Math.max(1, Math.min(99, rawWinRate)));
+        }
+
         function evaluateCell(index, player) {
             const r = Math.floor(index / BOARD_SIZE);
             const c = index % BOARD_SIZE;
@@ -544,8 +604,6 @@
                 gameActive = false;
                 let finalResultString = result === 'tie' ? "Draw" : (result === 'X' ? "Player (Black) Wins" : "Computer (White) Wins");
                 
-                // UX FIX: Display a button to view the report instead of auto-triggering it immediately.
-                // This allows the player to review the final board state freely.
                 document.getElementById('status').innerHTML = `
                     <span>Game Over: ${finalResultString}!</span>
                     <button onclick="generateMatchReport('${finalResultString}')" style="padding: 5px 12px; cursor: pointer; font-weight: bold; background: #007bff; color: white; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📊 View AI Report</button>
@@ -580,15 +638,8 @@
             let csvContent = "Step,Player,Position,Evaluation_Label,Comment,Missed_Best_Move\n";
             
             gameHistory.forEach(row => { 
-                // DATA STANDARDIZATION FIX: 
-                // 1. Convert 'X'/'O' to 'Black'/'White'
                 let playerColor = row.player === 'X' ? 'Black' : 'White';
-                
-                // 2. Convert linear index (0-224) to Gomoku coordinate mapping (e.g., A1, H8)
-                let colChar = String.fromCharCode(65 + (row.index % BOARD_SIZE)); // A, B, C...
-                let rowNum = Math.floor(row.index / BOARD_SIZE) + 1;              // 1, 2, 3...
-                let positionStr = `${colChar}${rowNum}`;
-                
+                let positionStr = indexToCoord(row.index);
                 csvContent += `${row.step},${playerColor},${positionStr},${row.evaluation_label},"${row.comment}",${row.missed_best_move}\n`; 
             });
             
@@ -601,7 +652,6 @@
             document.body.removeChild(link);
         }
 
-        // Note: The API call logic remains untouched as requested.
         async function generateMatchReport(finalResult) {
             const token = localStorage.getItem('access_token');
             const modal = document.getElementById('report-modal');
@@ -669,10 +719,20 @@
 
                 try {
                     const lastPlayerMove = [...gameHistory].reverse().find(m => m.player === "X");
+                    
+                    // --- DYNAMIC PAYLOAD INJECTION (NO API MODIFICATION) ---
+                    // We utilize the existing 'Optional[Dict]' structure to pass frontend calculations
+                    let evaluationPayload = lastPlayerMove ? { ...lastPlayerMove } : { label: "game_start", comment: "Game just started." };
+                    
+                    const bestNextIndex = getBestMoveForPlayer("X");
+                    evaluationPayload.suggested_next_move = indexToCoord(bestNextIndex);
+                    evaluationPayload.win_rate = calculateWinRate() + "%";
+                    // ---------------------------------------------------------
+
                     const response = await fetch(`${API_BASE_URL}/api/chat`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ message: message, board: board, last_evaluation: lastPlayerMove || null })
+                        body: JSON.stringify({ message: message, board: board, last_evaluation: evaluationPayload })
                     });
                     
                     if (response.status === 401) { executeLogout(); throw new Error("Session expired."); }
