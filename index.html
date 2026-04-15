@@ -14,7 +14,7 @@
         .auth-btn { padding: 5px 15px; cursor: pointer; font-weight: bold; background: #343a40; color: white; border: none; border-radius: 4px; }
         .auth-btn:hover { background: #23272b; }
 
-        /* 方案 B：初始隐藏游戏区域 */
+        /* Game Area Hidden Initially */
         #game-area { display: none; flex-direction: column; align-items: center; width: 100%; }
         #login-prompt { margin-top: 50px; text-align: center; color: #6c757d; }
 
@@ -40,16 +40,26 @@
         .modal-content { background: white; padding: 30px; border-radius: 12px; width: 80%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
         .btn { padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; border: none; }
-        #login-content { max-width: 400px; }
+        
+        /* Auth Form Specifics */
+        .auth-form-container { max-width: 400px; margin: 0 auto; }
         .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
         .form-group input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+        .auth-toggle-link { color: #007bff; cursor: pointer; text-decoration: underline; text-align: center; display: block; margin-top: 15px; font-size: 0.9em; }
+        
         #report-text { white-space: pre-wrap; font-size: 1.05em; line-height: 1.6; color: #333; max-height: 50vh; overflow-y: auto; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;}
         .btn-primary { background: #007bff; color: white; width: 100%; margin-bottom: 10px;}
         .btn-primary:hover { background: #0056b3; }
+        .btn-success { background: #28a745; color: white; width: 100%; margin-bottom: 10px;}
+        .btn-success:hover { background: #218838; }
         .btn-download { background: #28a745; color: white; }
         .btn-download:hover { background: #218838; }
         .close-btn { background: #dc3545; color: white; width: 100%;}
         .close-btn:hover { background: #c82333; }
+        
+        .alert-box { padding: 10px; margin-bottom: 15px; border-radius: 5px; display: none; text-align: center; font-weight: bold; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     </style>
 </head>
 <body>
@@ -58,12 +68,12 @@
     
     <div class="controls">
         <span class="auth-status" id="auth-status-display">Not Logged In</span>
-        <button class="auth-btn" id="auth-action-btn" onclick="openLoginModal()">Login</button>
+        <button class="auth-btn" id="auth-action-btn" onclick="openAuthModal('login')">Login</button>
     </div>
 
     <div id="login-prompt">
         <h2>👋 Welcome!</h2>
-        <p>Please login to access the game and AI coaching features.</p>
+        <p>Please login or sign up to access the game and AI coaching features.</p>
     </div>
 
     <div id="game-area">
@@ -106,18 +116,39 @@
         </div>
     </div>
 
-    <div id="login-modal" class="modal">
-        <div class="modal-content" id="login-content">
-            <h2 style="margin-top:0; color:#343a40;">🔐 User Login</h2>
-            <div id="login-error" style="color: red; margin-bottom: 10px; display: none;">Invalid credentials</div>
-            <div class="form-group">
-                <input type="text" id="login-username" placeholder="Username (admin)">
+    <div id="auth-modal" class="modal">
+        <div class="modal-content auth-form-container">
+            <h2 id="auth-title" style="margin-top:0; color:#343a40; text-align: center;">🔐 Login</h2>
+            
+            <div id="auth-alert" class="alert-box"></div>
+
+            <div id="login-form">
+                <div class="form-group">
+                    <input type="text" id="login-username" placeholder="Username">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key === 'Enter') executeLogin()">
+                </div>
+                <button class="btn btn-primary" onclick="executeLogin()">Login</button>
+                <span class="auth-toggle-link" onclick="switchAuthView('register')">Don't have an account? Sign Up</span>
             </div>
-            <div class="form-group">
-                <input type="password" id="login-password" placeholder="Password (secret123)" onkeydown="if(event.key === 'Enter') executeLogin()">
+
+            <div id="register-form" style="display: none;">
+                <div class="form-group">
+                    <input type="text" id="register-username" placeholder="Choose a Username">
+                </div>
+                <div class="form-group">
+                    <input type="email" id="register-email" placeholder="Email Address">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="register-password" placeholder="Create Password" onkeydown="if(event.key === 'Enter') executeRegister()">
+                </div>
+                <button class="btn btn-success" onclick="executeRegister()">Create Account</button>
+                <span class="auth-toggle-link" onclick="switchAuthView('login')">Already have an account? Login</span>
             </div>
-            <button class="btn btn-primary" onclick="executeLogin()">Login</button>
-            <button class="btn close-btn" onclick="closeLoginModal()">Cancel</button>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+            <button class="btn close-btn" onclick="closeAuthModal()">Cancel</button>
         </div>
     </div>
 
@@ -159,8 +190,8 @@
             } else {
                 statusDisplay.innerText = "❌ Not Logged In";
                 statusDisplay.style.background = "#f8d7da";
-                actionBtn.innerText = "Login";
-                actionBtn.onclick = openLoginModal;
+                actionBtn.innerText = "Login / Sign Up";
+                actionBtn.onclick = () => openAuthModal('login');
                 
                 gameArea.style.display = "none";
                 loginPrompt.style.display = "block";
@@ -169,13 +200,79 @@
             }
         }
 
-        function openLoginModal() { document.getElementById('login-modal').style.display = "flex"; document.getElementById('login-error').style.display = "none"; }
-        function closeLoginModal() { document.getElementById('login-modal').style.display = "none"; }
+        // --- MODAL & UI LOGIC ---
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('auth-alert');
+            alertBox.innerText = message;
+            alertBox.className = `alert-box alert-${type}`;
+            alertBox.style.display = 'block';
+        }
+        function hideAlert() { document.getElementById('auth-alert').style.display = 'none'; }
+
+        function switchAuthView(view) {
+            hideAlert();
+            if (view === 'login') {
+                document.getElementById('auth-title').innerText = "🔐 Login";
+                document.getElementById('login-form').style.display = "block";
+                document.getElementById('register-form').style.display = "none";
+            } else {
+                document.getElementById('auth-title').innerText = "📝 Sign Up";
+                document.getElementById('login-form').style.display = "none";
+                document.getElementById('register-form').style.display = "block";
+            }
+        }
+
+        function openAuthModal(initialView = 'login') {
+            document.getElementById('auth-modal').style.display = "flex";
+            switchAuthView(initialView);
+        }
+
+        function closeAuthModal() {
+            document.getElementById('auth-modal').style.display = "none";
+            hideAlert();
+        }
+
+        // --- API CALLS ---
+        async function executeRegister() {
+            const user = document.getElementById('register-username').value.trim();
+            const email = document.getElementById('register-email').value.trim();
+            const pass = document.getElementById('register-password').value.trim();
+
+            if (!user || !email || !pass) {
+                return showAlert("All fields are required.", "error");
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, email: email, password: pass })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Registration failed");
+                }
+
+                showAlert("Account created successfully! Please login.", "success");
+                
+                // Pre-fill login and switch view
+                document.getElementById('login-username').value = user;
+                document.getElementById('login-password').value = ""; // Force them to type password
+                setTimeout(() => switchAuthView('login'), 1500);
+
+            } catch (error) {
+                showAlert(error.message, "error");
+            }
+        }
 
         async function executeLogin() {
-            const user = document.getElementById('login-username').value;
-            const pass = document.getElementById('login-password').value;
-            const errorDiv = document.getElementById('login-error');
+            const user = document.getElementById('login-username').value.trim();
+            const pass = document.getElementById('login-password').value.trim();
+            
+            if (!user || !pass) return showAlert("Username and password required.", "error");
+
             const params = new URLSearchParams();
             params.append('username', user);
             params.append('password', pass);
@@ -186,13 +283,16 @@
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: params
                 });
-                if (!response.ok) throw new Error("Authentication failed");
+                
                 const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.detail || "Authentication failed");
+                
                 localStorage.setItem('access_token', data.access_token);
-                closeLoginModal();
+                closeAuthModal();
                 checkAuthState();
             } catch (error) {
-                errorDiv.style.display = "block";
+                showAlert(error.message, "error");
             }
         }
 
@@ -415,7 +515,6 @@
                 const response = await fetch(`${API_BASE_URL}/api/generate-report`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    // 修复点：这里传了真正的 gameHistory
                     body: JSON.stringify({ history: gameHistory, final_result: finalResult }) 
                 });
                 

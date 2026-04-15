@@ -1,3 +1,6 @@
 # Environments
 .env
 __pycache__/
+
+# Database
+*.db

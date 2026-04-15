@@ -6,13 +6,18 @@ from typing import Optional, Any, Dict
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from google.genai.types import EmbedContentConfig
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from google import genai 
+from google.genai.types import EmbedContentConfig
 from pinecone import Pinecone
 from dotenv import load_dotenv
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+
+# --- SQLAlchemy Imports ---
+from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
 # [SECURITY UPDATE] Initialize logging for secure auditing and debugging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +25,28 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
+
+# --- DATABASE CONFIGURATION ---
+# Using SQLite for local development. Easy migration to PostgreSQL later.
+SQLALCHEMY_DATABASE_URL = "sqlite:///./tictactoe.db"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# --- DB MODELS (ORM) ---
+class UserORM(Base):
+    """SQLAlchemy model for the 'users' table."""
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    disabled = Column(Boolean, default=False)
+
+# Create tables in the database
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -51,19 +78,8 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 pinecone_index = pc.Index("tictactoe-rag")
 
-# --- MOCK DATABASE ---
-# TODO: Migrate to PostgreSQL/SQLite via SQLAlchemy in the next iteration.
-MOCK_USERS_DB = {
-    "admin": {
-        "username": "admin",
-        "full_name": "Admin User",
-        "email": "admin@example.com",
-        "hashed_password": pwd_context.hash("secret123"),
-        "disabled": False,
-    }
-}
 
-# --- DATA MODELS ---
+# --- DATA MODELS (Pydantic) ---
 
 class Token(BaseModel):
     """Token model for authentication responses."""
@@ -74,16 +90,20 @@ class TokenData(BaseModel):
     """Data extracted from the JWT token."""
     username: Optional[str] = None
 
-class User(BaseModel):
-    """Base user model."""
+class UserCreate(BaseModel):
+    """Schema for user registration."""
     username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
+    password: str
+    email: EmailStr
 
-class UserInDB(User):
-    """User model including hashed password for internal DB operations."""
-    hashed_password: str
+class UserOut(BaseModel):
+    """Schema for returning user data securely (excluding password)."""
+    username: str
+    email: str
+    disabled: bool
+    
+    class Config:
+        from_attributes = True
 
 class ChatRequest(BaseModel):
     """Request schema for AI Chat."""
@@ -106,60 +126,27 @@ class GameReportRequest(BaseModel):
     history: list[Move]
     final_result: str
 
-# --- SECURITY UTILITIES ---
+
+# --- UTILITIES & DEPENDENCIES ---
+
+def get_db():
+    """Dependency to yield a database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verifies a plain-text password against a hashed password.
-
-    Args:
-        plain_password (str): The plain-text password input by the user.
-        hashed_password (str): The securely hashed password from the database.
-
-    Returns:
-        bool: True if passwords match, False otherwise.
-    """
+    """Verifies a plain-text password against a hashed password."""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """
-    Hashes a plain-text password using bcrypt.
-
-    Args:
-        password (str): The plain-text password to hash.
-
-    Returns:
-        str: The hashed password.
-    """
+    """Hashes a plain-text password using bcrypt."""
     return pwd_context.hash(password)
 
-def get_user(db: dict, username: str) -> Optional[UserInDB]:
-    """
-    Retrieves a user from the mock database.
-
-    Args:
-        db (dict): The mock database dictionary.
-        username (str): The username to query.
-
-    Returns:
-        Optional[UserInDB]: The user record if found, else None.
-    """
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
-    return None
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Creates a JWT access token.
-
-    Args:
-        data (dict): The payload data to encode into the token.
-        expires_delta (Optional[timedelta]): The lifespan of the token.
-
-    Returns:
-        str: The encoded JWT string.
-    """
+    """Creates a JWT access token."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -169,19 +156,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    """
-    Validates the provided JWT token and returns the corresponding user.
-
-    Args:
-        token (str): The JWT token extracted from the Authorization header.
-
-    Returns:
-        User: The authenticated user object.
-
-    Raises:
-        HTTPException: If token validation fails or user is not found.
-    """
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserORM:
+    """Validates the provided JWT token and returns the corresponding user from DB."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -195,40 +171,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(MOCK_USERS_DB, username=token_data.username)
+        
+    user = db.query(UserORM).filter(UserORM.username == token_data.username).first()
     if user is None:
         raise credentials_exception
     return user
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Ensures the current authenticated user is active.
-
-    Args:
-        current_user (User): The user object from token validation.
-
-    Returns:
-        User: The active user object.
-
-    Raises:
-        HTTPException: If the user account is disabled.
-    """
+async def get_current_active_user(current_user: UserORM = Depends(get_current_user)) -> UserORM:
+    """Ensures the current authenticated user is active."""
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+
 # --- CORE LOGIC FUNCTIONS ---
 
 def analyze_board(board: list[str]) -> str:
-    """
-    Analyzes the 4x4 Tic-Tac-Toe board for immediate tactical threats or winning moves.
-    
-    Args:
-        board (list[str]): The current 16-cell board state.
-        
-    Returns:
-        str: A tactical assessment string indicating critical moves or opportunities.
-    """
+    """Analyzes the 4x4 Tic-Tac-Toe board for immediate tactical threats or winning moves."""
     win_patterns = [
         [0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], 
         [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15], 
@@ -248,16 +207,7 @@ def analyze_board(board: list[str]) -> str:
     return f"[NEUTRAL]: No immediate threats. Safe moves available: {', '.join(empty_spots)}."
 
 def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
-    """
-    Retrieves expert 4x4 Tic-Tac-Toe strategies from Pinecone vector DB.
-    
-    Args:
-        board (list[str]): The current 16-cell board state.
-        user_message (str): The user's query for the AI coach.
-        
-    Returns:
-        str: Relevant expert context retrieved via RAG.
-    """
+    """Retrieves expert 4x4 Tic-Tac-Toe strategies from Pinecone vector DB."""
     center_indices = [5, 6, 9, 10]
     center_occupants = [board[i] for i in center_indices if board[i] != ""]
     center_status = "empty" if not center_occupants else f"occupied by {', '.join(set(center_occupants))}"
@@ -280,39 +230,64 @@ def retrieve_from_pinecone(board: list[str], user_message: str) -> str:
         logger.warning(f"RAG Retrieval failed: {str(e)}")
         return "Expert guidance unavailable."
 
+
 # --- API ENDPOINTS ---
 
+@app.post("/api/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    Registers a new user and persists data to SQLite.
+    """
+    # Check if username exists
+    db_user = db.query(UserORM).filter(UserORM.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    # Check if email exists
+    db_email = db.query(UserORM).filter(UserORM.email == user.email).first()
+    if db_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+        
+    hashed_pwd = get_password_hash(user.password)
+    new_user = UserORM(
+        username=user.username, 
+        email=user.email, 
+        hashed_password=hashed_pwd
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    logger.info(f"[SECURITY EVENT] New user registered successfully: {user.username}")
+    return new_user
+
 @app.post("/api/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
-    Authenticates a user and returns a JWT access token.
+    Authenticates a user against the database and returns a JWT access token.
     """
-    user = get_user(MOCK_USERS_DB, form_data.username)
+    user = db.query(UserORM).filter(UserORM.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/api/users/me", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
-    """
-    Returns the currently authenticated user's profile.
-    """
+@app.get("/api/users/me", response_model=UserOut)
+async def read_users_me(current_user: UserORM = Depends(get_current_active_user)):
+    """Returns the currently authenticated user's profile."""
     return current_user
 
 @app.post("/api/chat")
-def chat_with_ai(request: ChatRequest, current_user: User = Depends(get_current_active_user)) -> dict:
-    """
-    Handles user queries to the AI Coach using tactical analysis and RAG.
-    [SECURITY]: Requires a valid JWT token. Unauthenticated requests will be rejected.
-    """
+def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_current_active_user)) -> dict:
+    """Handles user queries to the AI Coach using tactical analysis and RAG."""
     logger.info(f"[SECURITY EVENT] User '{current_user.username}' requested AI chat.")
     
     tactical_analysis = analyze_board(request.board)
@@ -343,6 +318,7 @@ def chat_with_ai(request: ChatRequest, current_user: User = Depends(get_current_
     """
     
     try:
+        # Switching back to gemini-2.0-flash or gemini-1.5-flash as per the decision log for rate limits
         response = client.models.generate_content(model='gemini-2.5-flash', contents=system_prompt)
         return {"reply": response.text}
     except Exception as e:
@@ -350,11 +326,8 @@ def chat_with_ai(request: ChatRequest, current_user: User = Depends(get_current_
         return {"reply": "The AI coach is temporarily unavailable."}
 
 @app.post("/api/generate-report")
-async def generate_report(request: GameReportRequest, current_user: User = Depends(get_current_active_user)):
-    """
-    Generates an executive summary of the game using an LLM.
-    [SECURITY]: Requires a valid JWT token. Unauthenticated requests will be rejected.
-    """
+async def generate_report(request: GameReportRequest, current_user: UserORM = Depends(get_current_active_user)):
+    """Generates an executive summary of the game using an LLM."""
     logger.info(f"[SECURITY EVENT] User '{current_user.username}' requested match report generation.")
     
     history_summary = "\n".join([

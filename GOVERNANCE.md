@@ -14,6 +14,30 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Database Persistence & User Registration System
+
+**Date:** 2026-04-04
+**Branch:** `feature/database-integration`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **ORM & Database Engine**: Transitioned from a hardcoded `MOCK_USERS_DB` to a robust relational database model using **SQLAlchemy** and **SQLite** (`tictactoe.db`). This serves as a highly portable local development setup, ensuring a seamless future migration path to PostgreSQL in production.
+- **Registration Endpoint**: Engineered a new `/api/register` endpoint enforcing strict validation (Pydantic `EmailStr`) to prevent duplicate usernames and emails.
+- **Frontend Auth UI Evolution**: Upgraded the authentication state machine in `index.html` to support a unified Auth Modal with smooth toggling between "Login" and "Sign Up" views. Successfully decoupled the UI from the mock data limitation.
+
+#### 2. Security & Quality Audit
+
+- **Password Cryptography**: Maintained strict enforcement of `bcrypt` via `passlib` for all new user registrations. Raw passwords are mathematically guaranteed to never touch the database or logs.
+- **Audit Logging**: Enhanced server-side logging (`logger.info`) to explicitly track the exact identity and lifecycle events (`[SECURITY EVENT] New user registered successfully`).
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (SeanChen327)
+
+---
+
 ### Feature: User Authentication & Zero-Trust API Lockdown
 
 **Date:** 2026-04-03
