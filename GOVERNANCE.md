@@ -1,6 +1,6 @@
 # Project Governance & Decision Log
 
-## 📌 Project Workflows & Review Standards
+## Project Workflows & Review Standards
 
 To ensure production-grade quality and security, all contributors must strictly adhere to the following protocol:
 
@@ -13,6 +13,33 @@ To ensure production-grade quality and security, all contributors must strictly 
 ---
 
 ## 📖 Decision Log
+
+---
+
+### Feature: GitHub Actions Infrastructure Keep-Alive
+
+**Date:** 2026-04-15
+**Branch:** `feature/keep-alive-automation`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Automation Engine Selection**: Implemented GitHub Actions as the primary automation engine. This bypasses Render's known IP blocks on public monitoring services like UptimeRobot.
+- **Stealth Request Pattern**: Configured `curl` with a custom Chrome `User-Agent` string within the workflow to mimic organic browser traffic and prevent bot-detection interception.
+- **Minimal Resource Consumption**: Targeted the `/api/health` endpoint specifically. This ensures the container stays active without triggering high-cost database sessions or Gemini LLM tokens.
+- **Scheduling Strategy**: Set a 10-minute cron interval (`*/10 * * * *`) to stay within Render's 15-minute inactivity window while optimizing GitHub Actions' free-tier minutes.
+
+#### 2. Security & Quality Audit
+
+- **Zero-Logic Exposure**: The health check endpoint is public and read-only; no sensitive environment variables or user data are processed during automation.
+- **Local Validation**: Successfully validated the stealth request logic using `curl.exe` in a Windows PowerShell environment (handling alias conflicts) with a confirmed `200 OK` response.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
 
 ### Feature: Rich CSV Reporting & Heuristic Enhancement
 
