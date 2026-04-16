@@ -1,9 +1,5 @@
 # requirements-dev.txt
 # Development & Testing Dependencies ONLY - Do NOT deploy to Render
-langchain>=0.1.0
-langchain-google-genai>=0.0.9
-langchain-pinecone>=0.1.0
-langchain-core>=0.1.0
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 httpx>=0.24.0
