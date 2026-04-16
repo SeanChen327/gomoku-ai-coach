@@ -1,0 +1,42 @@
+# .github/workflows/ai-qa-pipeline.yml
+# ---------------------------------------------------------
+# Project: Gomoku AI Coach (15x15)
+# Feature: Automated AI Quality Assurance (LangChain Judge)
+# ---------------------------------------------------------
+
+name: AI Quality Assurance Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # 允许手动在 GitHub Actions 面板触发
+
+jobs:
+  llm-judge-validation:
+    name: Run LangChain Evaluator
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: 📦 Install Dependencies (Prod + Dev)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: 🧪 Execute LangChain Validation Suite
+        env:
+          # 必须在 GitHub 仓库的 Settings -> Secrets and variables -> Actions 中配置此密钥
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Running Pytest suite with LangChain Evaluator..."
+          pytest tests/test_llm_outputs.py -v -W ignore::DeprecationWarning

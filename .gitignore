@@ -7,3 +7,14 @@ __pycache__/
 
 # Rag Knowledge
 renjunet_knowledge.json
+
+# Virtual Environments
+venv/
+env/
+
+# Pytest and Caches
+.pytest_cache/
+.cache/
+
+# VS Code settings (optional but recommended)
+.vscode/

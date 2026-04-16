@@ -16,6 +16,28 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ---
 
+### Feature: LangChain Automated QA Evaluation Pipeline
+
+**Date:** 2026-04-16
+**Branch:** `feature/langchain-qa-evaluation`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **LLM-as-a-Judge Architecture**: Integrated `langchain` strictly into the testing layer (`tests/`) rather than the application runtime. This isolates our production FastAPI and Gemini SDK dependencies while unlocking advanced validation capabilities.
+- **Zero API Modification**: Mathematically guaranteed that `main.py` and existing endpoint contracts remain untouched, preserving production stability.
+
+#### 2. Security & Quality Audit
+
+- **Hallucination Mitigation**: The LangChain prompt template acts as an automated auditor, strictly failing any test where the AI Coach deviates from the injected frontend heuristic payloads (Win Rate / Coordinates).
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: GitHub Actions Infrastructure Keep-Alive
 
 **Date:** 2026-04-15
