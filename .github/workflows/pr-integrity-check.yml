@@ -84,7 +84,7 @@ jobs:
       - name: 🧪 Execute Automated QA Suite
         # 运行包含 LangChain Judge 的自动化测试
         run: |
-          pytest tests/test_llm_outputs.py -v -W ignore::DeprecationWarning
+          python -m pytest tests/ -v -W ignore::DeprecationWarning
 
       - name: 📜 Archive Logs on Failure
         if: failure()
