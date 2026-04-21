@@ -37,6 +37,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }} # [新增] 注入 Pinecone 密钥
+          MOCK_AI: "true"
         run: |
           echo "Running Pytest suite with LangChain Evaluator..."
           pytest tests/test_llm_outputs.py -v -W ignore::DeprecationWarning
