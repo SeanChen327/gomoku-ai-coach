@@ -3,4 +3,7 @@
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 httpx>=0.24.0
+
+# --- E2E Testing Dependencies ---
+playwright>=1.40.0
 pytest-playwright>=0.4.0
