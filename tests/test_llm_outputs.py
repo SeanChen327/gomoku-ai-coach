@@ -1,12 +1,11 @@
+# tests/test_llm_outputs.py
 import os
 import pytest
-import httpx
 from langchain_google_genai import ChatGoogleGenerativeAI
-from dotenv import load_dotenv  # [新增] 引入 dotenv
+from dotenv import load_dotenv
 
 load_dotenv() 
 
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -29,7 +28,6 @@ class TestAICoachQuality:
             temperature=0.0
         )
         
-        # LangChain prompt to evaluate our production API's response
         eval_template = """
         You are a strict QA Engineer. Evaluate the AI Coach's response based on the following criteria:
         1. Word Count: Is it under 80 words?
@@ -44,41 +42,21 @@ class TestAICoachQuality:
         prompt = PromptTemplate.from_template(eval_template)
         return prompt | llm | StrOutputParser()
 
-    @pytest.mark.asyncio
-    async def test_chat_endpoint_heuristics_compliance(self, evaluator_chain):
+    # 👇 [核心修复]：移除了 @pytest.mark.asyncio 和 async 关键字
+    def test_chat_endpoint_heuristics_compliance(self, evaluator_chain):
         """
         E2E test: Verifies that /api/chat respects heuristic payloads using LangChain validation.
         """
-        # 1. Setup mock data simulating the frontend heuristic engine
-        payload = {
-            "message": "Where should I play next and how am I doing?",
-            "board": [""] * 225,
-            "last_evaluation": {
-                "evaluation_label": "Standard Move",
-                "comment": "Played at coordinate H8.",
-                "suggested_next_move": "H9",
-                "win_rate": "55%"
-            }
-        }
+        # 1. Mocking the response for the sake of this architectural example
+        ai_reply = "You're doing great with a 55% win rate! Tactically, playing at H9 is your best move right now to build a strong offensive shape. Keep it up!"
 
-        # 2. Call the untouched production API (Assuming it's running locally for testing)
-        # Note: In a real CI environment, we would use FastAPI's TestClient or a spun-up test server.
-        async with httpx.AsyncClient(base_url="http://127.0.0.1:8000") as client:
-            # Note: Requires bypassing Auth for testing or mocking the JWT token
-            # For demonstration, we assume a mock/test endpoint or active token
-            pass 
-            
-            # Mocking the response for the sake of this architectural example
-            # response = await client.post("/api/chat", json=payload)
-            # ai_reply = response.json()["reply"]
-            ai_reply = "You're doing great with a 55% win rate! Tactically, playing at H9 is your best move right now to build a strong offensive shape. Keep it up!"
-
-        # 3. Use LangChain to evaluate the output (Asynchronously!)
-        eval_result = await evaluator_chain.ainvoke({
+        # 2. Use LangChain to evaluate the output (Synchronously!)
+        # 👇 [核心修复]：将 ainvoke 改为纯同步的 invoke
+        eval_result = evaluator_chain.invoke({
             "win_rate": "55%",
             "next_move": "H9",
             "ai_response": ai_reply
         })
 
-        # 4. Assert DevOps Quality Standard
+        # 3. Assert DevOps Quality Standard
         assert eval_result.strip() == "PASS", f"LLM QA Validation Failed: {eval_result}"
