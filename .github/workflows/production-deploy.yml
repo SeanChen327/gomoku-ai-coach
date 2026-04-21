@@ -50,7 +50,7 @@ jobs:
           exit 1
 
       - name: 🧪 Execute Core Tests
-        run: pytest tests/test_llm_outputs.py -v -W ignore::DeprecationWarning
+        run: python -m pytest tests/ -v -W ignore::DeprecationWarning
 
   # 阶段二：受控部署 (仅在阶段一成功后执行)
   deploy-to-render:
