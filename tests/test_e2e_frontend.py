@@ -81,3 +81,73 @@ class TestFrontendE2E:
         # 5. 测试关闭功能
         page.locator("#auth-modal .close-btn").click()
         expect(modal).not_to_be_visible()
+    
+    def test_core_gameplay_and_ai_chat(self, page: Page, live_server: str):
+        """
+        验证点：真实用户视角下的核心业务流。
+        涵盖：UI注册登录 -> 玩家落子 -> AI启发式回棋 -> 调出AI教练追问对局状况。
+        """
+        page.goto(live_server)
+
+        # ---------------------------------------------------------
+        # 1. 极速 UI 注册与登录 (使用时间戳防止用户名冲突)
+        # ---------------------------------------------------------
+        import time
+        username = f"player_{int(time.time())}"
+        
+        # 打开弹窗 -> 切换到注册
+        page.locator("#auth-action-btn").click()
+        page.locator("#login-form .auth-toggle-link").click()
+        
+        # 填写注册信息并提交
+        page.locator("#register-username").fill(username)
+        page.locator("#register-email").fill(f"{username}@example.com")
+        page.locator("#register-password").fill("E2eTestPass123!")
+        page.locator("#register-form .btn-success").click()
+
+        # 等待自动切回登录页面，填入信息并登录
+        page.locator("#login-username").fill(username)
+        page.locator("#login-password").fill("E2eTestPass123!")
+        page.locator("#login-form .btn-primary").click()
+
+        # 验证：登录成功，游戏棋盘成功渲染
+        game_area = page.locator("#game-area")
+        expect(game_area).to_be_visible(timeout=5000)
+
+        # ---------------------------------------------------------
+        # 2. 模拟真实下棋交互 (人机大战)
+        # ---------------------------------------------------------
+        # 点击天元位置 (中心点 H8，索引 112)
+        center_cell = page.locator("#cell-112")
+        center_cell.click()
+
+        # 验证：玩家的黑子 (X) 已正确渲染到棋盘上
+        expect(center_cell.locator(".stone-X")).to_be_visible()
+
+        # 验证：系统调用了 getHeuristicMove()，并且 AI 最终落下了白子 (O)
+        # (只要页面上出现了任何一个 .stone-O，就说明前端逻辑跑通了)
+        expect(page.locator(".stone-O").first).to_be_visible(timeout=3000)
+
+        # ---------------------------------------------------------
+        # 3. 验证 AI 教练 (LangChain + Gemini RAG) 通讯
+        # ---------------------------------------------------------
+        # 唤起聊天气泡
+        page.locator("#chat-toggle").click()
+        expect(page.locator("#chat-container")).to_be_visible()
+
+        # 输入测试问题
+        chat_input = page.locator("#chat-input")
+        chat_input.fill("What is my win rate right now?")
+        
+        # 点击发送
+        page.locator("#chat-input-area button").click()
+
+        # 验证：用户的消息成功上屏
+        expect(page.locator("#chat-history")).to_contain_text("What is my win rate right now?")
+
+        # 验证：AI 的最终回复成功上屏 (避开 "Analyzing board..." 的 Loading 状态)
+        # 因为调用大模型需要时间，我们给足 15 秒的 Timeout
+        ai_responses = page.locator("#chat-history .ai-msg")
+        expect(ai_responses.last).not_to_contain_text("Analyzing board...", timeout=15000)
+        # 确保它确实回了一段话 (长度大于 0)
+        expect(ai_responses.last).to_be_visible()
