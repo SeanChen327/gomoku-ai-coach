@@ -8,11 +8,14 @@ import pytest
 import multiprocessing
 import uvicorn
 import time
+import os
 from playwright.sync_api import Page, expect
 
 # --- 本地测试服务器管理 ---
 def run_server():
     """在后台运行真实的 FastAPI 服务器供浏览器访问"""
+    # [QA Gate] 强制注入 MOCK_AI 环境变量给子进程，避免 E2E 测试耗尽真实 API 配额
+    os.environ["MOCK_AI"] = "true"
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="critical")
 
 @pytest.fixture(scope="module", autouse=True)
@@ -92,7 +95,6 @@ class TestFrontendE2E:
         # ---------------------------------------------------------
         # 1. 极速 UI 注册与登录 (使用时间戳防止用户名冲突)
         # ---------------------------------------------------------
-        import time
         username = f"player_{int(time.time())}"
         
         # 打开弹窗 -> 切换到注册
@@ -146,7 +148,7 @@ class TestFrontendE2E:
         expect(page.locator("#chat-history")).to_contain_text("What is my win rate right now?")
 
         # 验证：AI 的最终回复成功上屏 (避开 "Analyzing board..." 的 Loading 状态)
-        # 因为调用大模型需要时间，我们给足 15 秒的 Timeout
+        # 开启了 MOCK_AI 挡板，这里返回 mock 数据。给足 15 秒 Timeout。
         ai_responses = page.locator("#chat-history .ai-msg")
         expect(ai_responses.last).not_to_contain_text("Analyzing board...", timeout=15000)
         # 确保它确实回了一段话 (长度大于 0)

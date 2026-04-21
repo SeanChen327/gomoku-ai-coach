@@ -42,7 +42,11 @@ class TestAICoachQuality:
         prompt = PromptTemplate.from_template(eval_template)
         return prompt | llm | StrOutputParser()
 
-    # 👇 [核心修复]：移除了 @pytest.mark.asyncio 和 async 关键字
+    # 👇 [QA Gate]：注入 skipif 装饰器，当处于 Mock 模式时自动跳过此用例，保护 API 配额
+    @pytest.mark.skipif(
+        os.getenv("MOCK_AI", "false").lower() == "true", 
+        reason="Skipping LLM evaluation to conserve Gemini API Quota in CI."
+    )
     def test_chat_endpoint_heuristics_compliance(self, evaluator_chain):
         """
         E2E test: Verifies that /api/chat respects heuristic payloads using LangChain validation.
@@ -51,7 +55,6 @@ class TestAICoachQuality:
         ai_reply = "You're doing great with a 55% win rate! Tactically, playing at H9 is your best move right now to build a strong offensive shape. Keep it up!"
 
         # 2. Use LangChain to evaluate the output (Synchronously!)
-        # 👇 [核心修复]：将 ainvoke 改为纯同步的 invoke
         eval_result = evaluator_chain.invoke({
             "win_rate": "55%",
             "next_move": "H9",

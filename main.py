@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import os
 import json
 from datetime import datetime, timedelta
@@ -300,9 +301,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         raise HTTPException(status_code=401, detail="Incorrect credentials")
     return {"access_token": create_access_token(data={"sub": user.username}), "token_type": "bearer"}
 
+# [DevOps] 环境变量控制是否启用挡板模式
+MOCK_AI = os.getenv("MOCK_AI", "false").lower() == "true"
+
 @app.post("/api/chat")
 async def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_current_active_user)):
     logger.info(f"User '{current_user.username}' requested AI chat.")
+    
+    # [QA Gate] 如果处于 CI/CD 挡板模式，跳过大模型调用以保护 API Quota
+    if MOCK_AI:
+        await asyncio.sleep(1) # 模拟网络延迟，保证前端 Loading 动画的测试时序
+        return {"reply": "[MOCK AI] You're doing great! Keep an eye on H9."}
+
     try:
         reply = await rag_service.get_chain().ainvoke({
             "message": request.message,
