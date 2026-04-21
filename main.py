@@ -15,6 +15,8 @@ from google import genai
 from dotenv import load_dotenv
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from ai_governance import GomokuAIGovernance # [NEW] Import the governance module
+import time # Ensure time is imported for latency tracking
 
 # --- SQLAlchemy Imports ---
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, JSON, ForeignKey
@@ -84,6 +86,9 @@ class ScheduledMatchORM(Base):
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# Instantiate the governance layer based on the AI Periodic Table
+governance = GomokuAIGovernance()
 
 # [NEW] 从环境变量读取 Cron 密钥
 CRON_SECRET = os.getenv("CRON_SECRET", "default_internal_secret_change_me")
@@ -315,22 +320,45 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 @app.post("/api/chat")
 async def chat_with_ai(request: ChatRequest, current_user: UserORM = Depends(get_current_active_user)):
     logger.info(f"User '{current_user.username}' requested AI chat.")
+    start_t = time.time()
     
-    # 👇 [QA Gate] 如果处于 CI/CD 挡板模式，跳过大模型调用以保护 API Quota
+    # 👇 [QA Gate] If running in CI/CD mock mode
     if MOCK_AI:
-        await asyncio.sleep(1) # 模拟网络延迟，保证前端 Loading 动画的测试时序
-        return {"reply": "You're doing great with a 55% win rate! Tactically, playing at H9 is your best move right now to build a strong offensive shape. Keep it up!"}
+        await asyncio.sleep(1) 
+        reply_text = "You're doing great with a 55% win rate! Tactically, playing at H9 is your best move right now to build a strong offensive shape. Keep it up!"
+    else:
+        try:
+            reply_data = await rag_service.get_chain().ainvoke({
+                "message": request.message,
+                "board": request.board,
+                "last_evaluation": request.last_evaluation
+            })
+            reply_text = reply_data
+        except Exception as e:
+            logger.error(f"Chat Error: {str(e)}")
+            return {"reply": "The AI coach is temporarily unavailable.", "telemetry": {}}
 
-    try:
-        reply = await rag_service.get_chain().ainvoke({
-            "message": request.message,
-            "board": request.board,
-            "last_evaluation": request.last_evaluation
-        })
-        return {"reply": reply}
-    except Exception as e:
-        logger.error(f"Chat Error: {str(e)}")
-        return {"reply": "The AI coach is temporarily unavailable."}
+    # ---------------------------------------------------------
+    # 🛡️ Validation Layer (Guardrails) 
+    # ---------------------------------------------------------
+    if not governance.validate_output_safety(reply_text, request.board):
+        # Fallback: Do not return erroneous coordinate hallucinations to the user
+        reply_text = "I apologize, my coordinate analysis was slightly off just now. Could you rephrase your question?"
+
+    # ---------------------------------------------------------
+    # 📊 Assurance Layer (Metrics + Evaluation)
+    # ---------------------------------------------------------
+    metrics = governance.track_telemetry(start_t, reply_text)
+    quality_score = governance.evaluate_response_consistency(reply_text, request.last_evaluation)
+
+    # Record production-grade logs including telemetry and quality scoring
+    logger.info(
+        f"[PROD_LOG] User: {current_user.username} | "
+        f"Quality Score: {quality_score:.2f} | "
+        f"Metrics: {metrics}"
+    )
+
+    return {"reply": reply_text, "telemetry": metrics}
 
 @app.post("/api/generate-report")
 async def generate_report(request: GameReportRequest, current_user: UserORM = Depends(get_current_active_user)):

@@ -14,6 +14,31 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+**Feature:** AI Governance Layer (Validation & Assurance)
+**Date:** 2026-04-21
+**Branch:** `feature/ai-governance-layer`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Framework Alignment (AI Periodic Table):** Formalized the project's adherence to the "AI Periodic Table" by implementing a dedicated ai_governance.py module, specifically targeting Validation (Guardrails) and Assurance (Metrics & Evaluation).
+- **Multi-Layered Guardrails (Gr):** Engineered a robust regex-based coordinate validation layer. Unlike standard LLM checks, this logic intercepts all letter-number patterns (e.g., Z99) to prevent out-of-bounds hallucinations and ensures suggested moves do not collide with existing stones on the 15x15 board.
+- **Telemetry & Cost Observability (Mt):** Integrated a real-time tracking system to monitor latency, token consumption, and estimated API costs (based on Gemini-2.0-Flash pricing) for every interaction.
+- **Consistency Evaluation (Ev):** Implemented a cross-reference auditor that compares the LLM's verbal win-rate reporting against the ground-truth heuristic data provided by the frontend engine, assigning a dynamic quality score to each response.
+
+#### 2. Security & Quality Audit
+
+- **Hallucination Firewall:** The /api/chat endpoint is now fortified. If the governance layer detects spatial logic errors (illegal coordinates), the system triggers a graceful fallback message instead of delivering erroneous tactical advice.
+- **Unit Test Integrity:** Established tests/test_ai_governance.py with 100% pass rate on boundary conditions, occupied cell collisions, and telemetry accuracy. Verified that the regex broad-capture fix successfully handles unexpected LLM output patterns.
+- **Audit Logging:** Implemented production-grade [PROD_LOG] markers. These logs provide a traceable audit trail of AI performance, cost, and reliability without exposing PII.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ### Feature: Load Testing & Data Lifecycle Management
 
 **Date:** 2026-04-21
