@@ -14,6 +14,77 @@ To ensure production-grade quality and security, all contributors must strictly 
 
 ## 📖 Decision Log
 
+### Feature: Core Engine Unit Tests (Mathematics & Logic)
+
+**Date:** 2026-04-20
+**Branch:** `feature/core-engine-tests`
+**Status:** Pending Peer Review
+
+#### 1. Technical Decisions
+
+- **Deterministic Testing:** Implemented a comprehensive `pytest` suite (`tests/test_ai_engine.py`) targeting the offline `GomokuSimulator` engine to ensure mathematical accuracy independently of LLM evaluations.
+- **Coordinate Integrity:** Mathematically verified the `index_to_coord` translation layer to prevent off-by-one errors across the 15x15 (0-224) grid.
+- **Heuristic Weight Verification:** Added strict assertions to guarantee the engine prioritizes lethal threats (assigning >= 10000 points to block an opponent's 4-in-a-row) and accurately evaluates offensive opportunities like "Open Threes" (~500 points).
+
+#### 2. Security & Quality Audit
+
+- **Algorithmic Confidence:** By isolating the engine logic from the API layer, we eliminated external variables, guaranteeing that the AI's foundational understanding of Gomoku rules remains perfectly intact.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
+### Feature: Controlled Continuous Deployment (CD Pipeline)
+
+**Date:** 2026-04-20
+**Branch:** `feature/controlled-cd`
+**Status:** Merged
+
+#### 1. Technical Decisions
+
+- **Deployment Orchestration:** Transitioned from Render's native Auto-Deploy to a highly controlled GitHub Actions Continuous Deployment (CD) pipeline (`production-deploy.yml`).
+- **Pre-Deploy Verification:** Engineered a strict gating mechanism where the production codebase must first spin up a background FastAPI instance and achieve a 100% pass rate on all Pytest suites before interacting with the live environment.
+- **Webhook Trigger:** Leveraged a secure Render Deploy Hook via `curl` to initiate the actual container build process only after the QA gate clears.
+
+#### 2. Security & Quality Audit
+
+- **Zero-Downtime Protection:** Disabled automatic deployments on Render. This guarantees that faulty logic, missing dependencies, or broken configuration files will fail the CI pipeline _before_ they can corrupt the live PostgreSQL database or cause a Cold Start Crash.
+- **Secret Management:** Securely injected the `RENDER_DEPLOY_HOOK_URL` into GitHub Secrets, ensuring no deployment credentials exist in the source code.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
+### Feature: PR Integrity & Security Gate (CI Pipeline)
+
+**Date:** 2026-04-20
+**Branch:** `feature/automated-integrity-gate`
+**Status:** Merged
+
+#### 1. Technical Decisions
+
+- **Static Application Security Testing (SAST):** Integrated `Bandit` into the CI pipeline (`pr-integrity-check.yml`) to automatically scan the Python codebase for High and Medium severity vulnerabilities (e.g., hardcoded credentials) upon every Pull Request.
+- **Background Process Polling:** Solved the CI blocking issue by deploying `uvicorn main:app &` via `nohup` into the background. Engineered a Bash polling script to ping `/api/health` 30 times, guaranteeing the server is fully hydrated before initiating LangChain QA tests.
+- **Artifact Archiving:** Implemented conditional logging (`if: failure()`) to export `server.log` as a downloadable GitHub Artifact, drastically reducing debugging time for failed CI runs.
+
+#### 2. Security & Quality Audit
+
+- **Fail-Fast Architecture:** The SAST scan acts as the primary firewall. If a security vulnerability is detected, the pipeline terminates immediately, preserving CI compute minutes and preventing insecure code from reaching peer review.
+- **Environment Isolation:** Evaluated the CI against a temporary `sqlite:///./test.db` to ensure zero cross-contamination with the production PostgreSQL database.
+
+#### 3. Review Protocol
+
+- **Primary Peer Reviewer**: Ruby (@xxandy-what)
+- **Technical Consultant**: Sean (@SeanChen327)
+
+---
+
 ## Feature: User-Defined AI Battle Scheduler
 
 **Date:** 2026-04-16
