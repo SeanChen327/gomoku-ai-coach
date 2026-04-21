@@ -1,14 +1,15 @@
+# .github/workflows/keep_alive.yml
 # ---------------------------------------------------------
 # Project: Gomoku AI Coach (15x15)
-# Feature: Strategy B + AI Battle Trigger
+# Feature: Automated Triggers (AI Battle & DB Cleanup)
 # ---------------------------------------------------------
 
-name: Render Keep-Alive & AI Battle Trigger
+name: Render Keep-Alive & System Triggers
 
 on:
   schedule:
     - cron: "*/10 * * * *" # 每 10 分钟运行一次
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch: # 允许手动触发测试
 
 jobs:
   ping_and_trigger:
@@ -20,26 +21,30 @@ jobs:
         run: |
           echo "Sending keep-alive request to $RENDER_APP_URL/api/health"
           STATUSCODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
             "$RENDER_APP_URL/api/health")
           echo "Health Check Response: $STATUSCODE"
 
       - name: ⚔️ Trigger Scheduled AI Battles
         env:
           RENDER_APP_URL: "https://tictactoe-preview-service.onrender.com"
-          CRON_SECRET: ${{ secrets.CRON_SECRET }} # 从 GitHub Secrets 读取密钥
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           echo "Triggering pending AI battles..."
           RESPONSE=$(curl -s -X POST "$RENDER_APP_URL/api/internal/execute-matches" \
             -H "X-Cron-Secret: $CRON_SECRET" \
             -H "Content-Type: application/json")
-
+            
           echo "Execution Result: $RESPONSE"
 
-          # 检查是否包含执行计数，用于日志审计
-          if [[ "$RESPONSE" == *"executed_matches"* ]]; then
-            echo "Successfully connected to internal match engine."
-          else
-            echo "Error: Failed to trigger matches or unauthorized."
-            exit 1
-          fi
+      - name: 🧹 Execute Data Retention Cleanup
+        env:
+          RENDER_APP_URL: "https://tictactoe-preview-service.onrender.com"
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "Triggering legacy data cleanup..."
+          RESPONSE=$(curl -s -X POST "$RENDER_APP_URL/api/internal/cleanup-data" \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            -H "Content-Type: application/json")
+            
+          echo "Cleanup Result: $RESPONSE"

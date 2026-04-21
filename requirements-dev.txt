@@ -7,3 +7,6 @@ httpx>=0.24.0
 # --- E2E Testing Dependencies ---
 playwright>=1.40.0
 pytest-playwright>=0.4.0
+
+# --- Load Testing Dependencies ---
+locust>=2.20.0

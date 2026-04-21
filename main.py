@@ -451,3 +451,30 @@ async def execute_scheduled_matches(
     
     db.commit()
     return {"executed_matches": executed_count}
+
+# 👇 [核心新增] 数据生命周期管理接口 (Data Retention Cleanup)
+@app.post("/api/internal/cleanup-data")
+async def cleanup_old_data(
+    x_cron_secret: str = Header(None), 
+    db: Session = Depends(get_db)
+):
+    """
+    [INTERNAL] 删除 30 天前的陈旧对局数据，防止数据库存储溢出。
+    由 GitHub Actions 定时任务触发。
+    """
+    if x_cron_secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized internal call")
+
+    # 设定清理阈值：30天前
+    cutoff_date = datetime.utcnow() - timedelta(days=30)
+    
+    try:
+        deleted_count = db.query(ScheduledMatchORM).filter(
+            ScheduledMatchORM.created_at < cutoff_date
+        ).delete()
+        db.commit()
+        logger.info(f"Data cleanup executed. Removed {deleted_count} old matches.")
+        return {"status": "success", "deleted_records": deleted_count, "cutoff": cutoff_date.isoformat()}
+    except Exception as e:
+        logger.error(f"Data cleanup failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Cleanup failed")
