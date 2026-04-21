@@ -1,7 +1,7 @@
 # .github/workflows/pr-integrity-check.yml
 # ---------------------------------------------------------
 # Project: Gomoku AI Coach (15x15)
-# Feature: PR Integrity & Security Gate (SAST + Integration)
+# Feature: PR Integrity & Security Gate (SAST + Integration + E2E)
 # ---------------------------------------------------------
 
 name: PR Integrity & Security Gate
@@ -32,9 +32,9 @@ jobs:
         # -r: 递归扫描, -x: 排除测试文件夹, -ll: 只报告中高级风险
         run: bandit -r . -x ./tests -ll
 
-  # 第二阶段：集成测试与 AI 质量审计
+  # 第二阶段：集成测试、E2E 测试与 AI 质量审计
   integrity-and-ai-qa:
-    name: 🧪 Integrity & AI QA
+    name: 🧪 Integrity & E2E QA
     runs-on: ubuntu-latest
     needs: security-sast # 只有安全扫描通过后才运行
     env:
@@ -59,6 +59,10 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      # 👇 [新增的核心修复] 安装 Playwright 及其系统级依赖 (Chromium内核)
+      - name: 🎭 Install Playwright Browsers
+        run: playwright install chromium --with-deps
+
       - name: 🚀 Start FastAPI Server (Background)
         # 使用 nohup 将服务器挂载到后台运行，并将日志重定向
         run: |
@@ -82,7 +86,7 @@ jobs:
           exit 1
 
       - name: 🧪 Execute Automated QA Suite
-        # 运行包含 LangChain Judge 的自动化测试
+        # 运行包含 LangChain Judge, API 集成测试, 和 Playwright E2E 的自动化测试
         run: |
           python -m pytest tests/ -v -W ignore::DeprecationWarning
 
