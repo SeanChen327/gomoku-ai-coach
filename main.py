@@ -257,12 +257,12 @@ class GomokuRagService:
         
         User Question: "{message}"
         
-        [STRICT GUIDELINES]:
-        1. Acknowledge this is Gomoku (15x15 grid).
-        2. Only rely on the provided metrics. Do not hallucinate coordinates.
-        3. If asked about the LAST MOVE: Evaluate it based on the recent move comment.
-        4. If asked about the NEXT MOVE: Use the suggested coordinate from context.
-        5. Keep response highly encouraging and under 80 words.
+        [STRICT GUIDELINES - READ CAREFULLY]:
+        1. BOARD LIMITS: The grid is 15x15. Columns are strictly A through O. Rows are strictly 1 through 15.
+        2. NO HALLUCINATION: If the user asks about the NEXT MOVE, you MUST ONLY suggest the exact coordinate provided in the [RECENT MOVE CONTEXT]. 
+        3. SYMBOL SEPARATION: Never combine the player symbol ('X' or 'O') with numbers to form coordinates (e.g., never say "X15").
+        4. If asked about the LAST MOVE: Evaluate it based on the recent move comment.
+        5. Keep your response highly encouraging, conversational, and strictly under 80 words.
         """)
 
         def format_move_context(input_data):
