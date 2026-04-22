@@ -1,0 +1,20 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="atari-py" />
+          <option value="gym" />
+          <option value="ptan" />
+          <option value="opencv-python" />
+          <option value="torch" />
+          <option value="torchvision" />
+          <option value="tensorflow" />
+          <option value="tensorboard" />
+          <option value="pybullet" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

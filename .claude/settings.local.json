@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(git log:*)",
+      "Bash(grep -E \"\\\\.\\(json|yml|yaml|toml|cfg|ini\\)$\")"
+    ]
+  }
+}
