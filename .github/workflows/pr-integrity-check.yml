@@ -1,7 +1,7 @@
 # .github/workflows/pr-integrity-check.yml
 # ---------------------------------------------------------
 # Project: Gomoku AI Coach (15x15)
-# Feature: PR Integrity & Security Gate (SAST + Integration + E2E)
+# Feature: PR Integrity & Security Gate (SAST + Integration + E2E + Caching)
 # ---------------------------------------------------------
 
 name: PR Integrity & Security Gate
@@ -12,7 +12,7 @@ on:
   workflow_dispatch: # 允许手动触发测试
 
 jobs:
-  # 第一阶段：安全扫描 (SAST)
+  # 第一阶段：安全扫描 (SAST) - 检查潜在的代码安全风险
   security-sast:
     name: 🛡️ Security Scan (Bandit)
     runs-on: ubuntu-latest
@@ -60,9 +60,31 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      # 👇 [新增的核心修复] 安装 Playwright 及其系统级依赖 (Chromium内核)
-      - name: 🎭 Install Playwright Browsers
+      # --- [性能优化：Playwright 缓存逻辑] ---
+
+      - name: 🎭 Get Playwright Version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(pip show playwright | grep Version | awk '{print $2}')" >> $GITHUB_ENV
+
+      - name: 🗄️ Cache Playwright Browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: 🎭 Install Playwright Browsers (If Cache Miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: playwright install chromium --with-deps
+
+      - name: 🎭 Install Operating System Dependencies (Always Required)
+        # 即使缓存命中了浏览器二进制文件，Ubuntu 系统级的依赖库（如 libgbm）仍需确保安装
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
+
+      # ---------------------------------------
 
       - name: 🚀 Start FastAPI Server (Background)
         # 使用 nohup 将服务器挂载到后台运行，并将日志重定向
