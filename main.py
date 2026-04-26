@@ -229,7 +229,7 @@ class GomokuRagService:
         # Rationale for k=3: Experiments show k=1 lacks sufficient tactical diversity, 
         # while k>=5 introduces context noise and increases token latency/cost. 
         # k=3 is the optimal baseline. Next architectural step: Fetch k=10 and apply Cross-Encoder Re-ranking.
-        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 2})
 
     async def _safe_retrieve(self, user_message: str, tactical_analysis: str, trace_id: str) -> str:
         """
@@ -278,7 +278,8 @@ class GomokuRagService:
         1. BOARD LIMITS: 15x15 grid. Columns A-O, Rows 1-15.
         2. NO HALLUCINATION: Only suggest exact coordinates provided in the TACTICAL ANALYSIS or RECENT MOVE.
         3. SYMBOL SEPARATION: Never combine player symbol with numbers (e.g., "X15").
-        4. Keep your response highly encouraging, conversational, and strictly under 80 words.
+        4. WIN RATE MANDATORY: You MUST explicitly state the user's current win rate percentage (e.g., "XX%") as provided in the [RECENT MOVE CONTEXT].
+        5. Keep your response highly encouraging, conversational, and strictly under 80 words.
         """)
         
         chain = prompt | self.llm | StrOutputParser()
